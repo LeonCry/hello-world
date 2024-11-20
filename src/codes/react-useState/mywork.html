@@ -1,3 +1,4 @@
+<!-- react的useState实现简易版 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -39,6 +40,7 @@
       const [counter,setCounter] = useState(0);
       // 第二个状态是是否显示详情
       const [show,setShow] = useState(false);
+      // 事件绑定
       addCounter.onclick = () => {
         setCounter(counter + 1);
       }
@@ -55,7 +57,6 @@
       renderIndex = 0;
       // 每一次的dom更新都相当于一次新的渲染，所有的script都要重新执行
       const [counter,show] = testUseState();
-      console.log(counter,show);
       counters.innerHTML = counter;
       description.innerHTML = show ? 'Details' : 'Show Details';
     }
