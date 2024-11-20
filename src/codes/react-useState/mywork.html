@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>myWork</title>
+</head>
+<body>
+  <button id="addCounter">Add Counter</button>
+  <button id="decreaseCounter">Decrease Counter</button>
+  <button id="showDetails">Show Details</button>
+  <p id="counters">0</p>
+  <p id="description">Show Details</p>
+  <script>
+    const addCounter = document.getElementById('addCounter');
+    const decreaseCounter = document.getElementById('decreaseCounter');
+    const counters = document.getElementById('counters');
+    const showDetails = document.getElementById('showDetails');
+    const description = document.getElementById('description');
+    const statues = [];
+    let renderIndex = 0;
+    const useState = (initValue) => {
+      const curIndex = renderIndex;
+      const setState = (newValue) => {
+        statues[curIndex][0] = newValue;
+        handleUpdateDom();
+      }
+      // 如果是第一次渲染，则创建一个新的状态
+      if(!statues[renderIndex]){
+        statues[renderIndex] = [initValue,setState];
+      }
+      renderIndex++;
+      // 如果已经有了状态，则返回原来的状态
+      return statues[renderIndex-1];
+    }
+    // 测试useState
+    const testUseState = () => {
+      // 第一个状态是计数器
+      const [counter,setCounter] = useState(0);
+      // 第二个状态是是否显示详情
+      const [show,setShow] = useState(false);
+      addCounter.onclick = () => {
+        setCounter(counter + 1);
+      }
+      decreaseCounter.onclick = () => {
+        setCounter(counter - 1);
+      }
+      showDetails.onclick = () => {
+        setShow(!show);
+      }
+      return [counter,show];
+    }
+    const handleUpdateDom = () => {
+      // dom更新时，将renderIndex重置
+      renderIndex = 0;
+      // 每一次的dom更新都相当于一次新的渲染，所有的script都要重新执行
+      const [counter,show] = testUseState();
+      console.log(counter,show);
+      counters.innerHTML = counter;
+      description.innerHTML = show ? 'Details' : 'Show Details';
+    }
+    handleUpdateDom();
+
+  </script>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: sans-serif; margin: 20px; padding: 0; }
+    button { display: block; margin-bottom: 10px; }
+  </style>
+</body>
+</html>
