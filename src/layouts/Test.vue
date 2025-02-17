@@ -2,7 +2,7 @@
 </script>
 
 <template>
-  <main class="h-screen w-screen">
-    <Test />
-  </main>
+  <div />
 </template>
+
+<style scoped lang="scss"></style>
