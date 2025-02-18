@@ -3,6 +3,6 @@
 
 <template>
   <main class="h-screen w-screen">
-    <Test />
+    <RouterView />
   </main>
 </template>
