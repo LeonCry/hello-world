@@ -17,33 +17,41 @@ onMounted(() => {
   }
   // 用来存储代理对象发生改变时需要执行的函数
   const bubble = new WeakMap<object, Map<string | symbol, Set<anyFnType>>>();
+  // get时,用来收集当前对象的key的响应函数
+  function track(target: Record<string | symbol, any>, key: string | symbol) {
+    if (!activeEffect)
+      return target[key];
+      // 从bubble中查找当前对象是否设置了响应函数
+    if (!bubble.get(target)) {
+      bubble.set(target, new Map().set(key, new Set()));
+    }
+    const map = bubble.get(target);
+    // 将activeEffect存入到key对应的set中
+    if (!map?.get(key)) {
+      map?.set(key, new Set());
+    }
+    map?.get(key)?.add(activeEffect);
+    activeEffect = undefined;
+  }
+  // set时,用来触发bubble中的函数
+  function trigger(target: Record<string | symbol, any>, key: string | symbol) {
+    // 当代理对象被修改时,执行bubble中的函数
+    // 首先查看bubble里是否有当前对象
+    if (!bubble.get(target))
+      return;
+      // 如果有,则看是否有当前key的set
+    const set = bubble.get(target)?.get(key);
+    set && set?.forEach(fn => fn());
+  }
   // 代理对象
   const proxyObj = new Proxy(data, {
     get(target, key) {
-      if (!activeEffect)
-        return target[key];
-      // 从bubble中查找当前对象是否设置了响应函数
-      if (!bubble.get(target)) {
-        bubble.set(target, new Map().set(key, new Set()));
-      }
-      const map = bubble.get(target);
-      // 将activeEffect存入到key对应的set中
-      if (!map?.get(key)) {
-        map?.set(key, new Set());
-      }
-      map?.get(key)?.add(activeEffect);
-      activeEffect = undefined;
+      track(target, key);
       return target[key];
     },
     set(target, key, value) {
       target[key] = value;
-      // 当代理对象被修改时,执行bubble中的函数
-      // 首先查看bubble里是否有当前对象
-      if (!bubble.get(target))
-        return true;
-      // 如果有,则看是否有当前key的set
-      const set = bubble.get(target)?.get(key);
-      set && set?.forEach(fn => fn());
+      trigger(target, key);
       return true;
     },
   });
