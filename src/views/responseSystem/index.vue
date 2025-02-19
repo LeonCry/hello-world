@@ -34,8 +34,8 @@ onMounted(() => {
   let activeEffect: anyFnType | undefined;
   // 设置副作用函数的函数，本次提交进行改造。
   function effect(fn: (...arg: any) => any) {
-    // 现在存储到依赖集合的副作用函数改造成了effectFn，可以对effectFn进行改造。
-    const effectFn: anyFnType = function () {
+    // cleanup函数
+    function cleanup(effectFn: anyFnType) {
       // 每次执行真副作用函数之前，都将所有的依赖集合中把副作用函数A删除掉。
       // 首先遍历activeEffect.deps,将set中的effectFn全部删除
       effectFn.deps?.forEach((v: Set<anyFnType> | undefined) => {
@@ -43,15 +43,21 @@ onMounted(() => {
       });
       // 然后清空activeEffect.deps
       effectFn.deps = [];
+    }
+    // 现在存储到依赖集合的副作用函数改造成了effectFn，可以对effectFn进行改造。
+    const effectFn: anyFnType = function () {
+      // 每次执行真副作用函数之前，都将所有的依赖集合中把副作用函数A删除掉。
+      // 首先遍历activeEffect.deps,将set中的effectFn全部删除
+      cleanup(effectFn);
+      activeEffect = effectFn;
       // 然后执行fn
       fn();
+      // 这是上一次提交时，修改错了的地方，应该是在执行fn()之后再将activeEffect置为undefined，而不是在get里面
+      activeEffect = undefined;
     };
     // 用来存储当前副作用函数的依赖集合
     effectFn.deps = [];
-    activeEffect = effectFn;
     effectFn();
-    // 这是上一次提交时，修改错了的地方，应该是在执行fn()之后再将activeEffect置为undefined，而不是在get里面
-    activeEffect = undefined;
   }
   // get时,用来收集当前对象的key的响应函数
   function track(target: Record<string | symbol, any>, key: string | symbol) {
@@ -78,7 +84,9 @@ onMounted(() => {
       return;
       // 如果有,则看是否有当前key的set
     const set = bubble.get(target)?.get(key);
-    set && set?.forEach(fn => fn());
+    // 修改问题：无限循环问题 set.forEach时，会不断删除并新增内容
+    const runningSet = new Set(set);
+    runningSet && runningSet?.forEach(fn => fn());
   }
   // 代理对象
   const proxyObj = new Proxy(data, {
@@ -110,6 +118,9 @@ onMounted(() => {
   setTimeout(() => {
     proxyObj.isShowText = false;
   }, 2000);
+  setTimeout(() => {
+    proxyObj.isShowText = true;
+  }, 2500);
   setTimeout(() => {
     proxyObj.text = '这是修改后的文本.';
   }, 3000);
