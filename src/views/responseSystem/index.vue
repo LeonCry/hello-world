@@ -41,6 +41,8 @@ onMounted(() => {
       effectFn.deps?.forEach((v: Set<anyFnType> | undefined) => {
         v?.delete(effectFn);
       });
+      // 然后清空activeEffect.deps
+      effectFn.deps = [];
       // 然后执行fn
       fn();
     };
