@@ -7,6 +7,3 @@ import './styles/main.css';
 
 const app = createApp(App).use(router).use(createPinia().use(piniaPluginPersistedstate));
 app.mount('#app');
-app.config.errorHandler = (err, instance, info) => {
-  console.log('error:', err, instance, info);
-};
