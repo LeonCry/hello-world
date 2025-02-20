@@ -1,36 +1,18 @@
-<!-- 写在前面: 本次提交旨在解决effect嵌套问题：
-  什么时候effect会发生嵌套？ 当我们一个组件里面又嵌套一个组件的时候，并且希望外面组件发生变化时，内里的组件也发生变化。
-  上一次提交的代码是无法完成嵌套功能的，因为内层组件的副作用存储变量activeEffect会永远覆盖掉外层组件的副作用函数。
-  effect(() => {
-    effect(() => {
-      console.log('设置  <p id="file" /> 的值');
-      pf!.textContent = proxyObj.file;
-    });
-    console.log('设置 <p id="text" /> 的值');
-    p!.textContent = proxyObj.text;
-  });
-  当如上述嵌套时，先执行内层组件的副作用函数，然后执行外层组件的副作用函数。就会出现上述问题。
-
-  ## 额外问题：对于内部组件，当我只想更新内部组件时，会发现内部组件更新多次。
-  以先执行外层组件的副作用函数，再执行内层组件的副作用函数为例（先内后外同样有问题）
-  effect(() => {
-    console.log('设置 <p id="text" /> 的值');
-    p!.textContent = proxyObj.text;
-    effect(() => {
-      console.log('设置  <p id="file" /> 的值');
-      pf!.textContent = proxyObj.file;
-    });
-  });
-  此时 修改 proxyObj.text 值是没有问题的，内部外部副作用函数都会更新。然而当我再修改 proxyObj.file时，
-   proxyObj.text 修改过几次，那么内部组件的副作用函数就会执行几次。初步判断是因为外层组件副作用函数执行时，
-   又相当于给内部组件添加了依赖，所以内部组件的副作用函数又会执行一次。
-   问题出现在
-   const effectFn: anyFnType = function () ....
-   这个地方，activeEffect = effectFn;问题是在effect里，effectFn每次都是一个新的函数(地址会变)，
-   所以即使是副作用函数是相同的函数，但是外层effectFn每次都是不同的，并存到对应的Set中。
-   // 我的初步解法：
-   额外声明一个全局栈set，用来存储真正的副作用函数fn，如果set里面有该fn,则在track的时候不再往里添了。
-   这个时候effect(...)也不能用匿名函数了，而是改成一个具名函数。
+<!-- 写在前面: 本次提交解决无限递归循环问题
+effect(() => {
+    pf.textContent = (proxyObj.num++).toString();
+    // 相当于 先读取 后 设置
+    proxyObj.num = proxyObj.num + 1;
+    pf.textContent = proxyObj.num
+});
+这段effect中，即读取又设置，导致了无限循环问题。
+例如，刚一开始初始化，
+effect函数执行；
+执行到fn();
+fn内部是 proxyObj.num = proxyObj.num + 1;
+先读取，触发track,向bubble加入了副作用函数fn;
+然后设置，触发trigger,执行副作用函数fn;
+然后在fn内部又触发先读取后设置,触发track然后触发trigger无限循环.
  -->
 <script setup lang="ts">
 import { last } from 'radash';
@@ -39,7 +21,7 @@ type anyFnType = ((...arg: any) => any) & { deps: (Set<anyFnType> | undefined)[]
 onMounted(() => {
   const data: Record<string | symbol, any> = {
     text: '这是初始文本.',
-    file: '这是初始file.',
+    num: 0,
   };
   // 用来存储代理对象发生改变时需要执行的函数
   const bubble = new WeakMap<object, Map<string | symbol, Set<anyFnType>>>();
@@ -80,14 +62,18 @@ onMounted(() => {
     }
     const set = map?.get(key);
     set?.add(activeEffect);
-    console.log(key, set);
     activeEffect.deps.push(set); // 将当前副作用函数存入到当前副作用函数的deps中
   }
   function trigger(target: Record<string | symbol, any>, key: string | symbol) {
     if (!bubble.get(target))
       return;
     const set = bubble.get(target)?.get(key);
-    const runningSet = new Set(set);
+    const runningSet: Set<anyFnType> = new Set();
+    set && set.forEach((fn) => {
+      // 如果当前副作用函数是正在执行的副作用函数，则不执行
+      if (activeEffect !== fn)
+        runningSet.add(fn);
+    });
     runningSet && runningSet?.forEach(fn => fn());
   }
   const proxyObj = new Proxy(data, {
@@ -103,23 +89,18 @@ onMounted(() => {
   });
 
   const p = document.getElementById('text')!;
-  const pf = document.getElementById('file')!;
+  const pf = document.getElementById('num')!;
   if (!p || !pf)
     return;
   effect(() => {
-    effect(() => {
-      console.log('设置  <p id="file" /> 的值');
-      pf!.textContent = proxyObj.file;
-    });
-    console.log('设置 <p id="text" /> 的值');
-    p!.textContent = proxyObj.text;
+    console.log('设置 <p id="num" /> 的值');
+    // 相当于 <p id="num" > {{ proxyObj.num++ }} </p>
+    proxyObj.num = proxyObj.num + 1;
+    pf.textContent = proxyObj.num;
   });
   setTimeout(() => {
-    proxyObj.text = '这是修改后的文本.';
+    proxyObj.num = 1;
   }, 2000);
-  setTimeout(() => {
-    proxyObj.file = '这是修改后的file.';
-  }, 4000);
   console.log(bubble);
 });
 </script>
@@ -127,7 +108,7 @@ onMounted(() => {
 <template>
   <div>
     <p id="text" />
-    <p id="file" />
+    <p id="num" />
   </div>
 </template>
 
