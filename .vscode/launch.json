@@ -1,15 +1,27 @@
 {
-  // 使用 IntelliSense 了解相关属性。
-  // 悬停以查看现有属性的描述。
-  // 欲了解更多信息，请访问: https://go.microsoft.com/fwlink/?linkid=830387
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Launch Edge",
+      // 使用 Chrome 浏览器调试
+      "type": "chrome",
+      // 使用 Edge 浏览器调试
+      // "type": "msedge",
       "request": "launch",
-      "type": "msedge",
-      "url": "http://localhost:3333", // 写自己的端口号
-      "webRoot": "${workspaceFolder}"
+      "name": "vue_debug",
+      // 项目的访问地址
+      "url": "http://localhost:3333",
+      "webRoot": "${workspaceFolder}",
+      "pathMapping": {
+        "/_karma_webpack_": "${workspaceFolder}"
+      },
+      "sourceMapPathOverrides": {
+        "webpack:/*": "${webRoot}/*",
+        "/./*": "${webRoot}/*",
+        "/src/*": "${webRoot}/*",
+        "/*": "*",
+        "/./~/*": "${webRoot}/node_modules/*"
+      },
+      "preLaunchTask": "debug start"
     }
   ]
 }

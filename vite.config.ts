@@ -38,9 +38,6 @@ export default defineConfig(({ mode }: ConfigEnv): UserConfig => {
       outDir: env.VITE_APP_OUTPUT,
       sourcemap: Boolean(env.VITE_APP_SOURCEMAP),
     },
-    configureWebpack: {
-      devtool: 'source-map',
-    },
     server: {
       host: 'localhost',
       port: 3333,
