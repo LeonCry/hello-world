@@ -1,23 +1,13 @@
-<!-- 写在前面: 本次提交解决无限递归循环问题
-effect(() => {
-    pf.textContent = (proxyObj.num++).toString();
-    // 相当于 先读取 后 设置
-    proxyObj.num = proxyObj.num + 1;
-    pf.textContent = proxyObj.num
-});
-这段effect中，即读取又设置，导致了无限循环问题。
-例如，刚一开始初始化，
-effect函数执行；
-执行到fn();
-fn内部是 proxyObj.num = proxyObj.num + 1;
-先读取，触发track,向bubble加入了副作用函数fn;
-然后设置，触发trigger,执行副作用函数fn;
-然后在fn内部又触发先读取后设置,触发track然后触发trigger无限循环.
+<!-- 写在前面: 本次提交实现调度执行功能，例如vue内连续多次修改响应式数据，但是只会触发最后一次更新的功能。
  -->
 <script setup lang="ts">
 import { last } from 'radash';
 
-type anyFnType = ((...arg: any) => any) & { deps: (Set<anyFnType> | undefined)[] };
+type anyFnType = ((...arg: any) => any)
+  & {
+    deps: (Set<anyFnType> | undefined)[]
+    options: Record<string, any>
+  };
 onMounted(() => {
   const data: Record<string | symbol, any> = {
     text: '这是初始文本.',
@@ -28,7 +18,8 @@ onMounted(() => {
   let activeEffect: anyFnType | undefined;
   // 用于存储activeEffect的栈
   const effectStack: anyFnType[] = [];
-  function effect(fn: (...arg: any) => any) {
+  // 为effect新增一个选项参数options,允许指定调度器scheduler
+  function effect(fn: (...arg: any) => any, options: Record<string, any> = {}) {
     // 每次执行真副作用函数之前，都将所有的依赖集合中把副作用函数A删除掉。
     function cleanup(effectFn: anyFnType) {
       effectFn.deps?.forEach((v: Set<anyFnType> | undefined) => {
@@ -46,6 +37,8 @@ onMounted(() => {
       effectStack.pop();
       activeEffect = last(effectStack) || undefined;
     };
+    // 将options挂载到effectFn上
+    effectFn.options = options;
     // 用来存储当前副作用函数的依赖集合
     effectFn.deps = [];
     effectFn();
@@ -74,7 +67,15 @@ onMounted(() => {
       if (activeEffect !== fn)
         runningSet.add(fn);
     });
-    runningSet && runningSet?.forEach(fn => fn());
+    runningSet && runningSet?.forEach((efn) => {
+      // 那么在执行的时候，如果有options.scheduler，则调用scheduler函数
+      if (efn?.options?.scheduler) {
+        efn?.options?.scheduler(efn);
+      }
+      else {
+        efn();
+      }
+    });
   }
   const proxyObj = new Proxy(data, {
     get(target, key) {
@@ -93,16 +94,41 @@ onMounted(() => {
   if (!p || !pf)
     return;
   effect(() => {
-    console.log('设置 <p id="num" /> 的值');
-    // 相当于 <p id="num" > {{ proxyObj.num++ }} </p>
-    proxyObj.num = proxyObj.num + 1;
     pf.textContent = proxyObj.num;
+    console.log(`设置 <p id="num" /> 的值为:${(proxyObj.num).toString()}`);
+  }, {
+    // fn就是副作用函数,scheduler本次实现的是vue内连续多次修改响应式数据，但是只会触发最后一次更新的功能。
+    scheduler: (fn: anyFnType) => {
+      console.log('先调度执行');
+      flushJob(fn);
+    },
   });
   setTimeout(() => {
-    proxyObj.num = 1;
+    proxyObj.num++;
+    proxyObj.num++;
   }, 2000);
   console.log(bubble);
 });
+// 定义一个队列set，用来存储需要执行的副作用函数
+const jobQueue: Set<anyFnType> = new Set();
+let isFlushing = false;
+// 定义一个函数，用来实现vue内连续多次修改响应式数据，但是只会触发最后一次更新的功能。
+// fn: 副作用函数
+function flushJob(fn: anyFnType) {
+  jobQueue.add(fn);
+  if (isFlushing)
+    return;
+  isFlushing = true;
+  // 定义一个微任务，在同步任务执行完后，最后执行微任务队列，执行所有的副作用函数
+  Promise.resolve().then(() => {
+    jobQueue.forEach((fn) => {
+      fn();
+    });
+  }).finally(() => {
+    jobQueue.clear();
+    isFlushing = false;
+  });
+}
 </script>
 
 <template>
