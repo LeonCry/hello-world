@@ -1,5 +1,7 @@
 <!-- 写在前面:
-  本次提交实现简单watch实现
+  本次提交实现:
+  watch本身带有一个功能就是:可以在回调函数中获得旧值与新值,本次提交将实现这个功能.
+  具体实现方案就是开启lazy,在手动调用函数前获得oldValue,在手动调用函数后获得newValue
  -->
 <script setup lang="ts">
 import { last } from 'radash';
@@ -120,23 +122,27 @@ onMounted(() => {
     };
     return value;
   }
-  function watch(source: any, cb: any) {
+  let oldValue: any, newValue: any;
+  function watch(source: any, cb: (oldValue?: any, newValue?: any) => void) {
     // source有两种情况,一种是obj对象,一种是getter函数形式
     let getter = source;
     if (typeof source !== 'function') {
       getter = () => traverse(source);
     }
-    effect(getter, {
+    const effectFn = effect(getter, {
+      lazy: true,
       scheduler(efn: any) {
-        efn();
-        cb();
+        newValue = efn();
+        cb(oldValue, newValue);
+        oldValue = JSON.parse(JSON.stringify(newValue));
       },
-    });
+    })!;
+    oldValue = JSON.parse(JSON.stringify(effectFn()));
   }
-  watch(obj, () => {
-    console.log('numA变化了');
+  watch(() => obj.numA, (oldV, newV) => {
+    console.log('numA变化了', oldV, newV);
   });
-  obj.numA = 2;
+  obj.numA = 109;
 });
 </script>
 
