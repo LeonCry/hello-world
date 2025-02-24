@@ -1,4 +1,4 @@
-<!-- 写在前面: 本次提交实现调度执行功能，例如vue内连续多次修改响应式数据，但是只会触发最后一次更新的功能。
+<!-- 写在前面:
  -->
 <script setup lang="ts">
 import { last } from 'radash';
@@ -6,7 +6,12 @@ import { last } from 'radash';
 type anyFnType = ((...arg: any) => any)
   & {
     deps: (Set<anyFnType> | undefined)[]
-    options: Record<string, any>
+    options: {
+      // 调度器，连续多次修改响应式数据，但是只会触发最后一次更新的功能。
+      scheduler?: (...args: any) => any
+      // 是否初始化时立即执行副作用函数。
+      lazy?: boolean
+    }
   };
 onMounted(() => {
   const data: Record<string | symbol, any> = {
@@ -41,7 +46,14 @@ onMounted(() => {
     effectFn.options = options;
     // 用来存储当前副作用函数的依赖集合
     effectFn.deps = [];
-    effectFn();
+    // 如果没有lazy选项，或者lazy选项的值为false，则立即执行副作用函数
+    if (!options.lazy) {
+      effectFn();
+    }
+    // 否则就将副作用函数返回，让用户自己定义何时调用副作用函数。
+    else {
+      return effectFn;
+    }
   }
   function track(target: Record<string | symbol, any>, key: string | symbol) {
     if (!activeEffect)
@@ -97,9 +109,7 @@ onMounted(() => {
     pf.textContent = proxyObj.num;
     console.log(`设置 <p id="num" /> 的值为:${(proxyObj.num).toString()}`);
   }, {
-    // fn就是副作用函数,scheduler本次实现的是vue内连续多次修改响应式数据，但是只会触发最后一次更新的功能。
     scheduler: (fn: anyFnType) => {
-      console.log('先调度执行');
       flushJob(fn);
     },
   });
@@ -109,10 +119,13 @@ onMounted(() => {
   }, 2000);
   console.log(bubble);
 });
+/**
+ * name:scheduler
+ * 调度器功能,连续多次修改响应式数据，但是只会触发最后一次更新的功能。
+ */
 // 定义一个队列set，用来存储需要执行的副作用函数
 const jobQueue: Set<anyFnType> = new Set();
 let isFlushing = false;
-// 定义一个函数，用来实现vue内连续多次修改响应式数据，但是只会触发最后一次更新的功能。
 // fn: 副作用函数
 function flushJob(fn: anyFnType) {
   jobQueue.add(fn);

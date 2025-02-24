@@ -11,6 +11,10 @@ const routes: Array<RouteRecordRaw> = [
         path: 'responseSystem',
         component: () => import('@/views/responseSystem/index.vue'),
       },
+      {
+        path: 'compute-watch',
+        component: () => import('@/views/compute&watch/index.vue'),
+      },
     ],
   },
 ];
