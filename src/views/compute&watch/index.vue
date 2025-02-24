@@ -1,6 +1,8 @@
 <!-- 写在前面:
-  本次提交旨在实现vue.js的computed核心功能
-
+  上次提交简单实现了一个computed函数功能,实现的计算属性只做到了懒计算,也就是说,只有当你真正读取 sumRes.value 的值时,
+  它才会进行计算并得到值,但是每次访问 sumRes.value 时都会重新计算,这样就会造成性能浪费,因为 sumRes.value 的值是不会变的,
+  这就是为什么我们需要缓存功能的原因,即只有当依赖的数据发生变化时,才会重新计算,否则直接返回上次的计算结果。
+  本次提交实现该功能.
  -->
 <script setup lang="ts">
 import { last } from 'radash';
@@ -62,7 +64,13 @@ onMounted(() => {
       }
     });
     runningSet && runningSet.forEach((fn: any) => {
-      fn();
+      // 那么在执行的时候，如果有options.scheduler，则调用scheduler函数
+      if (fn?.options?.scheduler) {
+        fn?.options?.scheduler(fn);
+      }
+      else {
+        fn();
+      }
     });
   };
   const obj = new Proxy(data, {
@@ -78,17 +86,30 @@ onMounted(() => {
   });
   console.log('bubble:', bubble);
   function computed(getter: (...args: any) => any) {
-    // lazy为true时，不会立即执行effect函数,而是将副作用函数返回,由用户自己定义何时调用副作用函数
-    const effectFn = effect(getter, { lazy: true })!;
-    // 只有当.value的时候才会计算值
+    // 此为缓存的数据
+    let value: any;
+    // 此为是否缓存的标志: dirty = true,脏数据,表示需要计算再返回,dirty = false表示可以返回缓存的数据
+    let dirty = true;
+    // 将 dirty = true传入scheduler,调度器会在 obj.numA || obj.numB || obj.numC变化时执行,执行时就说明脏数据了,需要重新计算,缓存不可用了.
+    const effectFn = effect(getter, { lazy: true, scheduler: (efn: any) => {
+      dirty = true;
+      efn();
+    } })!;
     const obj = {
       get value() {
-        return effectFn();
+        if (!dirty) {
+          console.log('走缓存...');
+          return value;
+        }
+        dirty = false;
+        value = effectFn();
+        return value;
       },
     };
     return obj;
   }
   const numTotal = computed(() => obj.numA + obj.numB + obj.numC);
+  console.log('numTotal:', numTotal.value);
   console.log('numTotal:', numTotal.value);
   obj.numA = 10;
   console.log('numTotal:', numTotal.value);
