@@ -1,13 +1,5 @@
 <!-- 写在前面:
-  本次提交实现上次提交后的一个缺陷:
-  const sumRes = computed(() => obj.foo + obj.bar)
-  effect(() => {
-    console.log(sumRes.value)
-  })
-  obj.foo++
-  当我们将computed的值放到另一个effect中时，如果obj.foo变化，sumRes.value不会变化，
-  因为computed的值是在effect中计算的，而effect中的值是在computed中计算的，这实际上就是一个effect嵌套的问题.
-  解决方法就是,当读取sumRes.value值时,我们手动进行track,当计算属性的依赖发生变化时,手动trigger.
+  本次提交实现简单watch实现
  -->
 <script setup lang="ts">
 import { last } from 'radash';
@@ -118,13 +110,33 @@ onMounted(() => {
     };
     return obj;
   }
-  const numTotal = computed(() => obj.numA + obj.numB + obj.numC);
-  effect(() => {
-    console.log(numTotal.value);
+  // 遍历对象,递归访问对象的每一个属性,将每一个属性都track掉,变成响应式的
+  function traverse(value: any, seen = new Set()) {
+    if (typeof value !== 'object' || value === null || seen.has(value))
+      return;
+    seen.add(value);
+    for (const k in value) {
+      traverse(value[k], seen);
+    };
+    return value;
+  }
+  function watch(source: any, cb: any) {
+    // source有两种情况,一种是obj对象,一种是getter函数形式
+    let getter = source;
+    if (typeof source !== 'function') {
+      getter = () => traverse(source);
+    }
+    effect(getter, {
+      scheduler(efn: any) {
+        efn();
+        cb();
+      },
+    });
+  }
+  watch(obj, () => {
+    console.log('numA变化了');
   });
-  setTimeout(() => {
-    obj.numA++;
-  }, 2000);
+  obj.numA = 2;
 });
 </script>
 
