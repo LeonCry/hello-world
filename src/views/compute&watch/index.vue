@@ -1,8 +1,13 @@
 <!-- 写在前面:
-  上次提交简单实现了一个computed函数功能,实现的计算属性只做到了懒计算,也就是说,只有当你真正读取 sumRes.value 的值时,
-  它才会进行计算并得到值,但是每次访问 sumRes.value 时都会重新计算,这样就会造成性能浪费,因为 sumRes.value 的值是不会变的,
-  这就是为什么我们需要缓存功能的原因,即只有当依赖的数据发生变化时,才会重新计算,否则直接返回上次的计算结果。
-  本次提交实现该功能.
+  本次提交实现上次提交后的一个缺陷:
+  const sumRes = computed(() => obj.foo + obj.bar)
+  effect(() => {
+    console.log(sumRes.value)
+  })
+  obj.foo++
+  当我们将computed的值放到另一个effect中时，如果obj.foo变化，sumRes.value不会变化，
+  因为computed的值是在effect中计算的，而effect中的值是在computed中计算的，这实际上就是一个effect嵌套的问题.
+  解决方法就是,当读取sumRes.value值时,我们手动进行track,当计算属性的依赖发生变化时,手动trigger.
  -->
 <script setup lang="ts">
 import { last } from 'radash';
@@ -91,11 +96,14 @@ onMounted(() => {
     // 此为是否缓存的标志: dirty = true,脏数据,表示需要计算再返回,dirty = false表示可以返回缓存的数据
     let dirty = true;
     // 将 dirty = true传入scheduler,调度器会在 obj.numA || obj.numB || obj.numC变化时执行,执行时就说明脏数据了,需要重新计算,缓存不可用了.
+    let obj: any;
     const effectFn = effect(getter, { lazy: true, scheduler: (efn: any) => {
       dirty = true;
+      // 依赖项发生变化时,手动trigger
+      trigger(obj, 'value');
       efn();
     } })!;
-    const obj = {
+    obj = {
       get value() {
         if (!dirty) {
           console.log('走缓存...');
@@ -103,16 +111,20 @@ onMounted(() => {
         }
         dirty = false;
         value = effectFn();
+        // 读取.value时,手动track
+        track(obj, 'value');
         return value;
       },
     };
     return obj;
   }
   const numTotal = computed(() => obj.numA + obj.numB + obj.numC);
-  console.log('numTotal:', numTotal.value);
-  console.log('numTotal:', numTotal.value);
-  obj.numA = 10;
-  console.log('numTotal:', numTotal.value);
+  effect(() => {
+    console.log(numTotal.value);
+  });
+  setTimeout(() => {
+    obj.numA++;
+  }, 2000);
 });
 </script>
 
