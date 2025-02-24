@@ -1,7 +1,13 @@
 <!-- 写在前面:
-  本次提交实现:
-  watch本身带有一个功能就是:可以在回调函数中获得旧值与新值,本次提交将实现这个功能.
-  具体实现方案就是开启lazy,在手动调用函数前获得oldValue,在手动调用函数后获得newValue
+  本次提交实现watch的一些options
+  例如:immediate,flush等.
+  flush选项表示回调函数调用的时机，有三个值可以选择
+  flush:{
+    pre：默认值，表示在dom更新前调用，比如这是你需要再改变其他数据，就使用pre，这些数据改变完一起更新dom，提高性能
+    post：表示dom更新完成后调用，比如你要获取dom或者子组件，跟我们之前使用nextTick的意思一样
+    sync：同步调用
+  }
+  本次提交仅实现了immediate选项,flush就相当于responseSystem中实现多次修改只响应一次的功能.
  -->
 <script setup lang="ts">
 import { last } from 'radash';
@@ -123,25 +129,32 @@ onMounted(() => {
     return value;
   }
   let oldValue: any, newValue: any;
-  function watch(source: any, cb: (oldValue?: any, newValue?: any) => void) {
+  function watch(source: any, cb: (oldValue?: any, newValue?: any) => void, options?: {
+    immediate?: boolean
+    flush?: 'pre' | 'post' | 'sync'
+  }) {
     // source有两种情况,一种是obj对象,一种是getter函数形式
     let getter = source;
     if (typeof source !== 'function') {
       getter = () => traverse(source);
     }
+    const scheduler = (efn: any) => {
+      newValue = efn();
+      cb(oldValue, newValue);
+      oldValue = JSON.parse(JSON.stringify(newValue));
+    };
     const effectFn = effect(getter, {
       lazy: true,
-      scheduler(efn: any) {
-        newValue = efn();
-        cb(oldValue, newValue);
-        oldValue = JSON.parse(JSON.stringify(newValue));
-      },
+      scheduler,
     })!;
+    if (options?.immediate) {
+      scheduler(effectFn);
+    }
     oldValue = JSON.parse(JSON.stringify(effectFn()));
   }
   watch(() => obj.numA, (oldV, newV) => {
     console.log('numA变化了', oldV, newV);
-  });
+  }, { immediate: true });
   obj.numA = 109;
 });
 </script>
