@@ -1,13 +1,20 @@
 <!-- 写在前面:
-  本次提交实现watch的一些options
-  例如:immediate,flush等.
-  flush选项表示回调函数调用的时机，有三个值可以选择
-  flush:{
-    pre：默认值，表示在dom更新前调用，比如这是你需要再改变其他数据，就使用pre，这些数据改变完一起更新dom，提高性能
-    post：表示dom更新完成后调用，比如你要获取dom或者子组件，跟我们之前使用nextTick的意思一样
-    sync：同步调用
-  }
-  本次提交仅实现了immediate选项,flush就相当于responseSystem中实现多次修改只响应一次的功能.
+  本次提交实现watch过期函数处理:onInvalidate
+  例如:
+  watch(obj, async (newValue, oldValue, onInvalidate) => {
+02   // 定义一个标志,代表当前副作用函数是否过期,默认为 false ,代表没有过期 03   let expired = false
+04   // 调用 onInvalidate() 函数注册一个过期回调
+05   onInvalidate(() => {
+06     // 当过期时,将 expired 设置为 true
+07     expired = true
+08   })
+10   // 发送网络请求
+11   const res = await fetch('/path/to/request')
+13   // 只有当该副作用函数的执行没有过期时,才会执行后续操作。
+14   if (!expired) {
+15     finalData = res
+16   }
+17 })
  -->
 <script setup lang="ts">
 import { last } from 'radash';
@@ -129,7 +136,7 @@ onMounted(() => {
     return value;
   }
   let oldValue: any, newValue: any;
-  function watch(source: any, cb: (oldValue?: any, newValue?: any) => void, options?: {
+  function watch(source: any, cb: (oldValue?: any, newValue?: any, onInvalidate?: any) => void, options?: {
     immediate?: boolean
     flush?: 'pre' | 'post' | 'sync'
   }) {
@@ -138,9 +145,18 @@ onMounted(() => {
     if (typeof source !== 'function') {
       getter = () => traverse(source);
     }
+    // 用来保存过期回调函数
+    let cleanup: any;
+    // 过期回调的处理,fn为用户自定义的过期回调处理
+    const onInvalidate = (fn: any) => {
+      cleanup = fn;
+    };
     const scheduler = (efn: any) => {
       newValue = efn();
-      cb(oldValue, newValue);
+      // 在执行回调之前执行过期处理函数
+      if (cleanup)
+        cleanup();
+      cb(oldValue, newValue, onInvalidate);
       oldValue = JSON.parse(JSON.stringify(newValue));
     };
     const effectFn = effect(getter, {
