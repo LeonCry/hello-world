@@ -1,3 +1,7 @@
+<!-- 写在前面:
+  本次提交旨在实现vue.js的computed核心功能
+
+ -->
 <script setup lang="ts">
 import { last } from 'radash';
 
@@ -8,9 +12,6 @@ interface OptionsType {
   lazy?: boolean
 }
 onMounted(() => {
-  const numEleA = document.getElementById('numA')!;
-  const numEleB = document.getElementById('numB')!;
-  const numEleC = document.getElementById('numC')!;
   const data: Record<string | symbol, any> = {
     numA: 1,
     numB: 2,
@@ -23,9 +24,11 @@ onMounted(() => {
     const effectFn = () => {
       activeEffect = effectFn;
       effectStack.push(effectFn);
-      fn();
+      // 如果定义的副作用函数是一个getter函数,则需要将其返回
+      const res = fn();
       effectStack.pop();
       activeEffect = last(effectStack) || undefined;
+      return res;
     };
     effectFn.options = options;
     if (!options?.lazy) {
@@ -73,24 +76,22 @@ onMounted(() => {
       return true;
     },
   });
-  effect(() => {
-    console.log('设置numA');
-    numEleA.textContent = obj.numA;
-  });
-  effect(() => {
-    console.log('设置numB');
-    numEleB.textContent = obj.numB;
-  });
-  effect(() => {
-    console.log('设置numC');
-    numEleC.textContent = obj.numC;
-  });
   console.log('bubble:', bubble);
-  setTimeout(() => {
-    obj.numA = 10;
-    obj.numB = 20;
-    obj.numC = 30;
-  }, 2000);
+  function computed(getter: (...args: any) => any) {
+    // lazy为true时，不会立即执行effect函数,而是将副作用函数返回,由用户自己定义何时调用副作用函数
+    const effectFn = effect(getter, { lazy: true })!;
+    // 只有当.value的时候才会计算值
+    const obj = {
+      get value() {
+        return effectFn();
+      },
+    };
+    return obj;
+  }
+  const numTotal = computed(() => obj.numA + obj.numB + obj.numC);
+  console.log('numTotal:', numTotal.value);
+  obj.numA = 10;
+  console.log('numTotal:', numTotal.value);
 });
 </script>
 
