@@ -1,15 +1,25 @@
 <!-- 写在前面:
-用来创建reactive,本次提交用来精简系统,只保留了响应系统的核心代码
+本次提交用来代理object,对象的读取操作除了有get之外,还有:
+  - 判断对象或原型上是否存在给定的 key : key in obj。
+  - 使用 for...in 循环遍历对象: for (const key in obj){}。
+  - 删除属性的操作代理: delete obj.key。
  -->
 <script setup lang="ts">
 import { last } from 'radash';
 
+enum TriggerType {
+  ADD = 'ADD',
+  SET = 'SET',
+  DELETE = 'DELETE',
+}
 onMounted(() => {
   const data: Record<string | symbol, any> = {
     numA: 1,
     numB: 2,
     numC: 3,
   };
+  // 用来标记for...in循环
+  const ITERATE_KEY = Symbol('ownKeys');
   let activeEffect: any = null;
   const bubble = new WeakMap();
   const effectStack: any[] = [];
@@ -36,7 +46,7 @@ onMounted(() => {
     }
     keySet?.get(key)?.add(activeEffect);
   };
-  const trigger = (target: Record<string | symbol, any>, key: string | symbol) => {
+  const trigger = (target: Record<string | symbol, any>, key: string | symbol, type: TriggerType) => {
     if (!bubble.has(target))
       return;
     const keySet = bubble.get(target)?.get(key);
@@ -46,21 +56,65 @@ onMounted(() => {
         runningSet.add(fn);
       }
     });
+    // 只有当属性新增 || 删除时,才会触发for...in对应的副作用函数
+    if ([TriggerType.ADD, TriggerType.DELETE].includes(type)) {
+      // 获得ITERATE_KEY对应的副作用函数集合,也就是for...in循环的副作用函数集合
+      const forInEffectFnSet = bubble.get(target)?.get(ITERATE_KEY);
+      forInEffectFnSet && forInEffectFnSet.forEach((fn: any) => {
+        if (activeEffect !== fn) {
+          runningSet.add(fn);
+        }
+      });
+    }
     runningSet && runningSet.forEach((fn: any) => {
       fn();
     });
   };
   const obj = new Proxy(data, {
+    // 赋值操作
+    set(target, key, value, receiver) {
+      // 如果属性不存在,则说明是在添加新属性,否则是设置已有属性
+      const type = Object.prototype.hasOwnProperty.call(target, key) ? TriggerType.SET : TriggerType.ADD;
+      Reflect.set(target, key, value, receiver);
+      trigger(target, key, type);
+      return true;
+    },
+    // 赋值操作: 拦截delete操作
+    deleteProperty(target, key) {
+      Reflect.deleteProperty(target, key);
+      // 由于删除属性时,也会触发for..in循环,所以我们要多传入一个type,用来区分是删除属性还是新增属性
+      trigger(target, key, TriggerType.DELETE);
+      return true;
+    },
+    // 读取操作
     get(target, key, receiver) {
       track(target, key);
       return Reflect.get(target, key, receiver);
     },
-    set(target, key, value, receiver) {
-      Reflect.set(target, key, value, receiver);
-      trigger(target, key);
-      return true;
+    // 读取操作: 拦截 key in obj 操作
+    has(target, key) {
+      track(target, key);
+      return Reflect.has(target, key);
+    },
+    // 读取操作: 拦截for...in循环
+    ownKeys(target) {
+      // 由于for...in循环只能拿到对象target,所以对于for...in循环,我们用一个Symbol = ITERATE_KEY来标记
+      track(target, ITERATE_KEY);
+      return Reflect.ownKeys(target);
     },
   });
+  effect(() => {
+    for (const key in obj) {
+      console.log(key);
+    }
+  });
+  // 尝试添加一个属性,这个时候应该触发set,但是set里面对于numD并没有存储对应的副作用函数,因此我们要对set进行改造.
+  setTimeout(() => {
+    obj.numD = 4;
+  }, 1000);
+  setTimeout(() => {
+    delete obj.numD;
+  }, 2000);
 });
 </script>
 

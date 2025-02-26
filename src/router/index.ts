@@ -15,6 +15,10 @@ const routes: Array<RouteRecordRaw> = [
         path: 'compute-watch',
         component: () => import('@/views/compute&watch/index.vue'),
       },
+      {
+        path: 'reactive',
+        component: () => import('@/views/reactive/index.vue'),
+      },
     ],
   },
 ];
