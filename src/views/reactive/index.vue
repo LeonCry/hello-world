@@ -1,5 +1,24 @@
 <!-- 写在前面:
-本次提交用来封装一个reactive.
+  本次提交用来解决一个问题: 屏蔽原型引起的更新
+  例如:
+  const parent = {bar:1}
+  const children = {}
+  //将children的原型指向parent
+  Object.setPrototypeOf(children, parent)
+  effect(() => {
+   console.log(child.bar) // 1
+  })
+  // 这个时候我们修改children.bar,会触发副作用函数2次
+  children.bar = 2
+  为什么会两次呢?
+  首先在副作用函数里面,读取child.bar的时候会触发get,将副作用函数存到children.bar对应的set里面
+  又因为children的原型指向parent,children没有bar属性,会取parent的,所有会读取parent.bar,这个时候会触发get,
+  将副作用函数存到parent.bar对应的set里面
+  那么在进行children.bar时修改的时候,会触发children的set拦截,触发副作用函数.
+  又因为,如果设置的属性不在对象上,那么会调用原型的set拦截函数,所以会再次触发副作用函数,因此我们要屏蔽原型副作用调用
+  问题:如果调用了原型的set函数,那么原型的bar值不应该也被修改了吗?
+  答案:不会,因为我们是调用的children.bar = 2进行修改的,当到原型对象拦截set时,其调用的
+  Reflect.set(target, key, value, receiver)中的receiver是children.所以不会修改原型的值
  -->
 <script setup lang="ts">
 import { last } from 'radash';
@@ -10,13 +29,10 @@ enum TriggerType {
   DELETE = 'DELETE',
 }
 onMounted(() => {
-  const data: Record<string | symbol, any> = {
-    numA: 1,
-    numB: 2,
-    numC: 3,
-  };
   // 用来标记for...in循环
   const ITERATE_KEY = Symbol('ownKeys');
+  // 用来标志proxy代理对象的原对象的访问属性
+  const RAW_KEY = Symbol('raw');
   let activeEffect: any = null;
   const bubble = new WeakMap();
   const effectStack: any[] = [];
@@ -79,6 +95,10 @@ onMounted(() => {
         // 如果属性不存在,则说明是在添加新属性,否则是设置已有属性
         const type = Object.prototype.hasOwnProperty.call(target, key) ? TriggerType.SET : TriggerType.ADD;
         Reflect.set(target, key, value, receiver);
+        // 原型也会触发副作用函数的解决办法:通过receiver来判断当前target是否是receiver的代理对象,如果不是,则不触发trigger
+        if (receiver[RAW_KEY] !== target) {
+          return true;
+        }
         trigger(target, key, type);
         return true;
       },
@@ -91,6 +111,10 @@ onMounted(() => {
       },
       // 读取操作
       get(target, key, receiver) {
+        // 通过RAW_KEY来获取代理对象的原对象
+        if (key === RAW_KEY) {
+          return target;
+        }
         track(target, key);
         return Reflect.get(target, key, receiver);
       },
@@ -107,19 +131,15 @@ onMounted(() => {
       },
     });
   }
-  const obj = reactive(data);
+  const o1 = { bar: 1 };
+  const o2 = {};
+  const parent = reactive(o1);
+  const children = reactive(o2);
+  Object.setPrototypeOf(children, parent);
   effect(() => {
-    for (const key in obj) {
-      console.log(key);
-    }
+    console.log(children.bar);
   });
-  // 尝试添加一个属性,这个时候应该触发set,但是set里面对于numD并没有存储对应的副作用函数,因此我们要对set进行改造.
-  setTimeout(() => {
-    obj.numD = 4;
-  }, 1000);
-  setTimeout(() => {
-    delete obj.numD;
-  }, 2000);
+  children.bar = 2;
 });
 </script>
 
