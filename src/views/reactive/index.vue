@@ -1,8 +1,5 @@
 <!-- 写在前面:
-本次提交用来代理object,对象的读取操作除了有get之外,还有:
-  - 判断对象或原型上是否存在给定的 key : key in obj。
-  - 使用 for...in 循环遍历对象: for (const key in obj){}。
-  - 删除属性的操作代理: delete obj.key。
+本次提交用来封装一个reactive.
  -->
 <script setup lang="ts">
 import { last } from 'radash';
@@ -70,39 +67,47 @@ onMounted(() => {
       fn();
     });
   };
-  const obj = new Proxy(data, {
+  // 封装成一个reactive函数
+  function reactive(obj: any) {
+    return new Proxy(obj, {
     // 赋值操作
-    set(target, key, value, receiver) {
-      // 如果属性不存在,则说明是在添加新属性,否则是设置已有属性
-      const type = Object.prototype.hasOwnProperty.call(target, key) ? TriggerType.SET : TriggerType.ADD;
-      Reflect.set(target, key, value, receiver);
-      trigger(target, key, type);
-      return true;
-    },
-    // 赋值操作: 拦截delete操作
-    deleteProperty(target, key) {
-      Reflect.deleteProperty(target, key);
-      // 由于删除属性时,也会触发for..in循环,所以我们要多传入一个type,用来区分是删除属性还是新增属性
-      trigger(target, key, TriggerType.DELETE);
-      return true;
-    },
-    // 读取操作
-    get(target, key, receiver) {
-      track(target, key);
-      return Reflect.get(target, key, receiver);
-    },
-    // 读取操作: 拦截 key in obj 操作
-    has(target, key) {
-      track(target, key);
-      return Reflect.has(target, key);
-    },
-    // 读取操作: 拦截for...in循环
-    ownKeys(target) {
+      set(target, key, value, receiver) {
+      // 如果设置的值和原来的值相同,则不应该触发副作用函数(同时需要考虑NaN !== NaN的情况)
+        if (target[key] === value || (Number.isNaN(target[key]) && Number.isNaN(value))) {
+          return true;
+        }
+        // 如果属性不存在,则说明是在添加新属性,否则是设置已有属性
+        const type = Object.prototype.hasOwnProperty.call(target, key) ? TriggerType.SET : TriggerType.ADD;
+        Reflect.set(target, key, value, receiver);
+        trigger(target, key, type);
+        return true;
+      },
+      // 赋值操作: 拦截delete操作
+      deleteProperty(target, key) {
+        Reflect.deleteProperty(target, key);
+        // 由于删除属性时,也会触发for..in循环,所以我们要多传入一个type,用来区分是删除属性还是新增属性
+        trigger(target, key, TriggerType.DELETE);
+        return true;
+      },
+      // 读取操作
+      get(target, key, receiver) {
+        track(target, key);
+        return Reflect.get(target, key, receiver);
+      },
+      // 读取操作: 拦截 key in obj 操作
+      has(target, key) {
+        track(target, key);
+        return Reflect.has(target, key);
+      },
+      // 读取操作: 拦截for...in循环
+      ownKeys(target) {
       // 由于for...in循环只能拿到对象target,所以对于for...in循环,我们用一个Symbol = ITERATE_KEY来标记
-      track(target, ITERATE_KEY);
-      return Reflect.ownKeys(target);
-    },
-  });
+        track(target, ITERATE_KEY);
+        return Reflect.ownKeys(target);
+      },
+    });
+  }
+  const obj = reactive(data);
   effect(() => {
     for (const key in obj) {
       console.log(key);
