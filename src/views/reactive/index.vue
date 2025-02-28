@@ -1,24 +1,6 @@
 <!-- 写在前面:
-  本次提交用来解决一个问题: 屏蔽原型引起的更新
-  例如:
-  const parent = {bar:1}
-  const children = {}
-  //将children的原型指向parent
-  Object.setPrototypeOf(children, parent)
-  effect(() => {
-   console.log(child.bar) // 1
-  })
-  // 这个时候我们修改children.bar,会触发副作用函数2次
-  children.bar = 2
-  为什么会两次呢?
-  首先在副作用函数里面,读取child.bar的时候会触发get,将副作用函数存到children.bar对应的set里面
-  又因为children的原型指向parent,children没有bar属性,会取parent的,所有会读取parent.bar,这个时候会触发get,
-  将副作用函数存到parent.bar对应的set里面
-  那么在进行children.bar时修改的时候,会触发children的set拦截,触发副作用函数.
-  又因为,如果设置的属性不在对象上,那么会调用原型的set拦截函数,所以会再次触发副作用函数,因此我们要屏蔽原型副作用调用
-  问题:如果调用了原型的set函数,那么原型的bar值不应该也被修改了吗?
-  答案:不会,因为我们是调用的children.bar = 2进行修改的,当到原型对象拦截set时,其调用的
-  Reflect.set(target, key, value, receiver)中的receiver是children.所以不会修改原型的值
+本次提交用来实现深响应与浅响应,即 reactive(深响应) 与 shallowReactive(浅响应)
+
  -->
 <script setup lang="ts">
 import { last } from 'radash';
@@ -84,7 +66,7 @@ onMounted(() => {
     });
   };
   // 封装成一个reactive函数
-  function reactive(obj: any) {
+  function createReactive(obj: any, isShallow: boolean) {
     return new Proxy(obj, {
     // 赋值操作
       set(target, key, value, receiver) {
@@ -116,6 +98,10 @@ onMounted(() => {
           return target;
         }
         track(target, key);
+        // 在这里实现深响应
+        const res = Reflect.get(target, key, receiver);
+        if (typeof res === 'object' && res !== null && !isShallow)
+          return reactive(res);
         return Reflect.get(target, key, receiver);
       },
       // 读取操作: 拦截 key in obj 操作
@@ -130,6 +116,14 @@ onMounted(() => {
         return Reflect.ownKeys(target);
       },
     });
+  }
+  // reactive 深响应
+  function reactive(obj: any) {
+    return createReactive(obj, false);
+  }
+  // shallowReactive 浅响应
+  function shallowReactive(obj: any) {
+    return createReactive(obj, true);
   }
   const o1 = { bar: 1 };
   const o2 = {};
