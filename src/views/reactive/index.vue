@@ -1,6 +1,9 @@
-<!-- 写在前面:
-本次提交用来实现只读和浅只读(例如props里面的对象就是只读的)
-vue里面的只读数据本质上也是对数据对象的代理
+<!-- 写在前面: 本次提交用来实现数组代理的功能,主要是设置元素值和设置length时的相关问题.
+  首先,如果直接读取数组的索引值,是可以触发get拦截的.例如arr[0],通过索引直接设置元素值的时候,也是可以触发set拦截的.
+  但是设置的时候会有一个问题,就是如果设置的索引大于了arr本身的length值,那么length属性也会变,就相当于隐式修改了length属性,
+  那么也应该触发length属性的副作用函数.
+  当然,如果修改length属性,也会隐式的修改数组本身.例如副作用函数访问arr[2],但是修改length属性为2,那么arr[2]的值就会变为undefined
+  此时,也应该触发arr[2]的副作用函数,但是arr[0],arr[1]的值并不会发生变化.
  -->
 <script setup lang="ts">
 import { last } from 'radash';
@@ -9,6 +12,8 @@ enum TriggerType {
   ADD = 'ADD',
   SET = 'SET',
   DELETE = 'DELETE',
+  ARRAY_SET = 'ARRAY_SET',
+  ARRAY_ADD = 'ARRAY_ADD',
 }
 onMounted(() => {
   // 用来标记for...in循环
@@ -51,6 +56,27 @@ onMounted(() => {
         runningSet.add(fn);
       }
     });
+    // 如果触发类型是数组,且ARRAY_ADD,则需要将length属性对应的副作用函数集合取出来重新执行
+    if (Array.isArray(target) && type === TriggerType.ARRAY_ADD) {
+      const lengthEffectFnSet = bubble.get(target)?.get('length');
+      lengthEffectFnSet && lengthEffectFnSet.forEach((fn: any) => {
+        if (activeEffect !== fn) {
+          runningSet.add(fn);
+        }
+      });
+    }
+    // 如果触发类型是数组,且触发的key是length,则需要将index>=length的元素对应的副作用函数集合取出来重新执行
+    if (Array.isArray(target) && key === 'length') {
+      bubble.get(target).forEach((effects: any, index: number) => {
+        if (index >= target[key]) {
+          effects && effects.forEach((fn: any) => {
+            if (activeEffect !== fn) {
+              runningSet.add(fn);
+            }
+          });
+        }
+      });
+    }
     // 只有当属性新增 || 删除时,才会触发for...in对应的副作用函数
     if ([TriggerType.ADD, TriggerType.DELETE].includes(type)) {
       // 获得ITERATE_KEY对应的副作用函数集合,也就是for...in循环的副作用函数集合
@@ -85,8 +111,12 @@ onMounted(() => {
         if (target[key] === value || (Number.isNaN(target[key]) && Number.isNaN(value))) {
           return true;
         }
-        // 如果属性不存在,则说明是在添加新属性,否则是设置已有属性
-        const type = Object.prototype.hasOwnProperty.call(target, key) ? TriggerType.SET : TriggerType.ADD;
+        // 判断当前操作的对象是否是数组,然后判断当前操作的key(index)是否已经超出了数组的长度,如果超出了,就说明是新增,
+        // length长度也需要改变,否则就是简单的设置值.
+        // 如果当前操作的对象不是数组,那么判断当前操作的属性是否存在,如果属性不存在,则说明是在添加新属性,否则是设置已有属性
+        const type = Array.isArray(target)
+          ? Number(key) < target.length ? TriggerType.ARRAY_SET : TriggerType.ARRAY_ADD
+          : Object.prototype.hasOwnProperty.call(target, key) ? TriggerType.SET : TriggerType.ADD;
         Reflect.set(target, key, value, receiver);
         // 原型也会触发副作用函数的解决办法:通过receiver来判断当前target是否是receiver的代理对象,如果不是,则不触发trigger
         if (receiver[RAW_KEY] !== target) {
@@ -150,15 +180,21 @@ onMounted(() => {
   function shallowReadonly(obj: any) {
     return createReactive(obj, true, true);
   }
-  const o1 = { bar: 1 };
-  const o2 = {};
-  const parent = reactive(o1);
-  const children = reactive(o2);
-  Object.setPrototypeOf(children, parent);
+  // const arr = reactive([0]);
+  // effect(() => {
+  //   console.log(arr.length);
+  // });
+  // setTimeout(() => {
+  //   arr[1] = 1;
+  // }, 1000);
+
+  const arr2 = reactive([0, 1, 2, 3, 4, 5]);
   effect(() => {
-    console.log(children.bar);
+    console.log(arr2[5]);
   });
-  children.bar = 2;
+  setTimeout(() => {
+    arr2.length = 5;
+  }, 1000);
 });
 </script>
 
