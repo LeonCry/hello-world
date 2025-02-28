@@ -1,6 +1,6 @@
 <!-- 写在前面:
-本次提交用来实现深响应与浅响应,即 reactive(深响应) 与 shallowReactive(浅响应)
-
+本次提交用来实现只读和浅只读(例如props里面的对象就是只读的)
+vue里面的只读数据本质上也是对数据对象的代理
  -->
 <script setup lang="ts">
 import { last } from 'radash';
@@ -66,11 +66,22 @@ onMounted(() => {
     });
   };
   // 封装成一个reactive函数
-  function createReactive(obj: any, isShallow: boolean) {
+  /**
+   *
+   * @param obj 要封装的对象
+   * @param isShallow 是否是浅响应
+   * @param isReadonly 是否只读
+   */
+  function createReactive(obj: any, isShallow: boolean = false, isReadonly: boolean = false) {
     return new Proxy(obj, {
     // 赋值操作
       set(target, key, value, receiver) {
-      // 如果设置的值和原来的值相同,则不应该触发副作用函数(同时需要考虑NaN !== NaN的情况)
+        // 设置只读属性
+        if (isReadonly) {
+          console.warn('要修改的属性是只读的');
+          return true;
+        }
+        // 如果设置的值和原来的值相同,则不应该触发副作用函数(同时需要考虑NaN !== NaN的情况)
         if (target[key] === value || (Number.isNaN(target[key]) && Number.isNaN(value))) {
           return true;
         }
@@ -97,11 +108,17 @@ onMounted(() => {
         if (key === RAW_KEY) {
           return target;
         }
-        track(target, key);
+        // 如果是只读的,则不需要为其建立响应
+        if (!isReadonly)
+          track(target, key);
         // 在这里实现深响应
         const res = Reflect.get(target, key, receiver);
-        if (typeof res === 'object' && res !== null && !isShallow)
+        if (typeof res === 'object' && res !== null && !isShallow) {
+          // 如果是只读的,则内部的对象也应该是只读的
+          if (isReadonly)
+            return readonly(res);
           return reactive(res);
+        }
         return Reflect.get(target, key, receiver);
       },
       // 读取操作: 拦截 key in obj 操作
@@ -119,11 +136,19 @@ onMounted(() => {
   }
   // reactive 深响应
   function reactive(obj: any) {
-    return createReactive(obj, false);
+    return createReactive(obj);
   }
   // shallowReactive 浅响应
   function shallowReactive(obj: any) {
     return createReactive(obj, true);
+  }
+  // 只读属性
+  function readonly(obj: any) {
+    return createReactive(obj, false, true);
+  }
+  // 浅只读属性
+  function shallowReadonly(obj: any) {
+    return createReactive(obj, true, true);
   }
   const o1 = { bar: 1 };
   const o2 = {};
