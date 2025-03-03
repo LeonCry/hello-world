@@ -1,4 +1,5 @@
-<!-- 写在前面: 本次提交引入ref的概念,并且引入响应丢失问题,以及响应丢失问题的解决方案:toRef以及toRefs -->
+<!-- 写在前面: 本次提交将实现一个功能:就是自动脱ref.例如在模板中调用ref数据时,不用再写.value(只针对toref)
+ -->
 <script setup lang="ts">
 import { effect, reactive } from '@/utils/reactive';
 
@@ -9,7 +10,7 @@ onMounted(() => {
     };
     // 用来判断是ref的value还是原对象本身携带的value
     Object.defineProperty(wrapper, '__v_isRef', { value: true });
-    return reactive(wrapper);
+    return reactive(wrapper); ;
   }
   // 解决响应式问题 toRef
   function toRef(obj: Record<keyof any, any>, key: keyof any) {
@@ -34,27 +35,34 @@ onMounted(() => {
     }
     return ret;
   }
-  const p = ref(1);
+  // 自动脱ref函数
+  function proxyRef(obj: any) {
+    return new Proxy(obj, {
+      get(target, key, receiver) {
+        const val = Reflect.get(target, key, receiver);
+        console.log(target);
+        // 说明是ref对象
+        return val?.__v_isRef === true ? val.value : val;
+      },
+      set(target, key, newVal, receiver) {
+        const val = target[key];
+        // 说明是ref对象
+        if (val?.__v_isRef) {
+          return val.value = newVal;
+        }
+        return Reflect.set(target, key, newVal, receiver);
+      },
+    });
+  }
+  const base = reactive({ a: 1, b: 2 });
+  const objRef = toRefs(base);
+  const obj = proxyRef(objRef);
   effect(() => {
-    console.log(p.value);
-  });
-  setTimeout(() => {
-    p.value = 10;
-  }, 500);
-  const obj = reactive({ a: 1, b: 2 });
-  const newObj = toRefs(obj);
-  effect(() => {
-    console.log(newObj.a.value);
+    console.log(objRef.a.value);
   });
   setTimeout(() => {
     obj.a = 10;
   }, 1000);
-  effect(() => {
-    console.log(obj.b);
-  });
-  setTimeout(() => {
-    newObj.b.value = 20;
-  }, 2000);
 });
 </script>
 
