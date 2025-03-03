@@ -19,6 +19,10 @@ const routes: Array<RouteRecordRaw> = [
         path: 'reactive',
         component: () => import('@/views/reactive/index.vue'),
       },
+      {
+        path: 'ref',
+        component: () => import('@/views/ref/index.vue'),
+      },
     ],
   },
 ];

@@ -13,6 +13,7 @@ declare module 'vue' {
     DefaultLayout: typeof import('./src/layouts/defaultLayout.vue')['default']
     Hello: typeof import('./src/views/Hello.vue')['default']
     Reactive: typeof import('./src/views/reactive/index.vue')['default']
+    Ref: typeof import('./src/views/ref/index.vue')['default']
     ResponceSystem: typeof import('./src/views/responceSystem/index.vue')['default']
     ResponseSystem: typeof import('./src/views/responseSystem/index.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
