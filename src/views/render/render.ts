@@ -1,23 +1,30 @@
-// 写在前面: 由于vue.js还具有跨平台的能力,因此,这些和浏览器有关的API都应该抽象化,以便具备多平台渲染的能力.
+// 写在前面: 针对DOM元素上的一些properties进行抽象化
 export interface NodeType {
   type: string
+  props?: Record<string, any>
   children: NodeType[] | string
 }
 export interface CreateRenderOptionsType {
   // 创建元素抽象化函数
   createElement: (tag: string) => HTMLElement
   // 设置文本节点抽象化函数
-  setElementText: (el: Element, text: string) => void
+  setElementText: (el: HTMLElement, text: string) => void
   // 插入元素抽象化函数
-  insert: (el: Element, parent: Element, anchor?: Element | null) => void
+  insert: (el: HTMLElement, parent: HTMLElement, anchor?: HTMLElement | null) => void
+  // 进行属性设置的抽象画函数
+  patchProps: (el: HTMLElement, key: string, value: any) => void
 }
 // 创建一个渲染器
 function createRenderer(options: CreateRenderOptionsType) {
-  const { createElement, setElementText, insert } = options;
+  const { createElement, setElementText, insert, patchProps } = options;
   // 挂载函数
   function mountElement(node: NodeType, container: HTMLElement) {
     // 创建dom元素
     const el = createElement(node.type);
+    // 进行属性properties设置
+    for (const key in node?.props) {
+      patchProps(el, key, node?.props[key]);
+    }
     // 如果children是文本节点,则直接设置到textContent里面
     if (typeof node.children === 'string') {
       setElementText(el, node.children);
