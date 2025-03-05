@@ -27,8 +27,12 @@ onMounted(() => {
   const app = document.getElementById('hello')!;
   const renderer = createRenderer(renderFnOptions);
   const node: NodeType = {
-    type: 'h1',
-    children: 'hello,world',
+    type: 'div',
+    children: [
+      { type: 'h1', children: 'hello,world' },
+      { type: 'h2', children: 'hello,world2' },
+      { type: 'h3', children: 'hello,world3' },
+    ],
   };
   renderer.render(node, app);
 });

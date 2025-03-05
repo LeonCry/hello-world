@@ -1,7 +1,7 @@
 // 写在前面: 由于vue.js还具有跨平台的能力,因此,这些和浏览器有关的API都应该抽象化,以便具备多平台渲染的能力.
 export interface NodeType {
   type: string
-  children: NodeType | string
+  children: NodeType[] | string
 }
 export interface CreateRenderOptionsType {
   // 创建元素抽象化函数
@@ -15,12 +15,18 @@ export interface CreateRenderOptionsType {
 function createRenderer(options: CreateRenderOptionsType) {
   const { createElement, setElementText, insert } = options;
   // 挂载函数
-  function mountElement(n: NodeType, container: HTMLElement) {
+  function mountElement(node: NodeType, container: HTMLElement) {
     // 创建dom元素
-    const el = createElement(n.type);
+    const el = createElement(node.type);
     // 如果children是文本节点,则直接设置到textContent里面
-    if (typeof n.children === 'string') {
-      setElementText(el, n.children);
+    if (typeof node.children === 'string') {
+      setElementText(el, node.children);
+    }
+    // 如果children仍然是一棵节点树,则仍旧循环挂载
+    else if (Array.isArray(node.children)) {
+      node.children.forEach((n) => {
+        mountElement(n, el);
+      });
     }
     // 挂载
     insert(el, container);
