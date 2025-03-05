@@ -3,6 +3,7 @@ export interface NodeType {
   type: string
   props?: Record<string, any>
   children: NodeType[] | string
+  el?: HTMLElement
 }
 export interface CreateRenderOptionsType {
   // 创建元素抽象化函数
@@ -19,8 +20,8 @@ function createRenderer(options: CreateRenderOptionsType) {
   const { createElement, setElementText, insert, patchProps } = options;
   // 挂载函数
   function mountElement(node: NodeType, container: HTMLElement) {
-    // 创建dom元素
-    const el = createElement(node.type);
+    // 创建dom元素,将虚拟node与真实node通过node.el建立联系
+    const el = node.el = createElement(node.type);
     // 进行属性properties设置
     for (const key in node?.props) {
       patchProps(el, key, node?.props[key]);
@@ -38,13 +39,20 @@ function createRenderer(options: CreateRenderOptionsType) {
     // 挂载
     insert(el, container);
   }
-  // n1:旧node,n2:新node,container:容器
+  // 更新函数 n1:旧node,n2:新node,container:容器
   function patch(n1: NodeType | undefined | null, n2: NodeType, container: HTMLElement) {
     // 如果旧的node不存在,说明是挂载
     if (!n1) {
       return mountElement(n2, container);
     }
     return '...';
+  }
+  // 卸载函数
+  function unmount(node: NodeType | null | undefined) {
+    if (!node?.el)
+      return;
+    const parent = node?.el?.parentNode;
+    parent && parent.removeChild(node.el);
   }
   function render(vnode: NodeType | null, container: HTMLElement & { _vnode?: NodeType | null }) {
     // 有新的node树,新增or更新
@@ -53,7 +61,7 @@ function createRenderer(options: CreateRenderOptionsType) {
     }
     // 没有新node树,则是卸载
     else {
-      container.innerHTML = '';
+      unmount(container._vnode);
     }
     container._vnode = vnode;
   }
