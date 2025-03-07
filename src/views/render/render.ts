@@ -1,4 +1,7 @@
-// 写在前面: 本次提交用来实现更新子节点的功能
+// 写在前面: 本次提交用表示文本节点和注释节点的问题
+// 在vNode中,除了单个文本,还有文本节点这种类型,例如:<div>我是文本节点 <img /> </div> 那么这种情况下文本节点就要使用一种
+// 独立的type用来表示并渲染(注释节点也是同理),比如声明一个symbol(text)用来表示文本节点,那么在后续进行挂载或更新的时候,要对其
+// 进行特殊判断.(未开发此次功能)
 export interface NodeType {
   type: string
   props?: Record<string, any>
@@ -26,7 +29,7 @@ function createRenderer(options: CreateRenderOptionsType) {
     for (const key in node?.props) {
       patchProps(el, key, node?.props[key]);
     }
-    // 如果children是文本节点,则直接设置到textContent里面
+    // 如果children是单个的文本,则直接设置到textContent里面
     if (typeof node.children === 'string') {
       setElementText(el, node.children);
     }
@@ -60,8 +63,8 @@ function createRenderer(options: CreateRenderOptionsType) {
   }
   // 子节点的更新函数 n1旧节点 n2新节点
   function patchChildren(n1: NodeType, n2: NodeType, el: HTMLElement) {
-    // 新旧子节点之间的关系一共有 3x3=9种, 新旧子节点都有 空节点  文本节点  一组子节点  三种情况,因此要分别判断
-    // 首先是新节点是文本节点的情况
+    // 新旧子节点之间的关系一共有 3x3=9种, 新旧子节点都有 空节点  单个文本  一组子节点  三种情况,因此要分别判断
+    // 首先是新节点是单个文本的情况
     if (typeof n2.children === 'string') {
       // 旧节点为一组子节点情况,卸载旧子节点
       if (Array.isArray(n1.children)) {
@@ -77,7 +80,7 @@ function createRenderer(options: CreateRenderOptionsType) {
         n1.children.forEach(c => unmount(c));
         n2.children.forEach(c => mountElement(c, el));
       }
-      // 旧节点为文本节点或无
+      // 旧节点为单个文本或无
       else {
         setElementText(el, '');
         n2.children.forEach(c => mountElement(c, el));
@@ -89,7 +92,7 @@ function createRenderer(options: CreateRenderOptionsType) {
       if (Array.isArray(n1.children)) {
         n1.children.forEach(c => unmount(c));
       }
-      // 旧节点为文本节点,直接置空
+      // 旧节点为单个文本,直接置空
       else {
         setElementText(el, '');
       }
