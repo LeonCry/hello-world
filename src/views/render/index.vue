@@ -34,14 +34,15 @@ const renderFnOptions: CreateRenderOptionsType = {
       if (value) {
         // 如果原来的DOM有事件处理函数,则只需要更新下事件处理函数即可
         if (invoker[key]) {
-          invoker[key] = () => {
-            // value可能有多个响应函数
-            invoker.value.forEach((v: any) => v());
-          };
-          invoker.value = value;
+          invoker[key].value = value;
         }
         // 如果原先没有,则需要新增事件
         else {
+          invoker[key] = () => {
+            // value可能有多个响应函数
+            invoker[key].value.forEach((v: any) => v());
+          };
+          invoker[key].value = value;
           el.addEventListener(eventName, invoker[key]);
         }
       }
