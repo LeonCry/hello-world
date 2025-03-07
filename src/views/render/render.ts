@@ -1,4 +1,4 @@
-// 写在前面: 针对DOM元素上的一些properties进行抽象化
+// 写在前面: 本次提交用来实现更新子节点的功能
 export interface NodeType {
   type: string
   props?: Record<string, any>
@@ -39,13 +39,70 @@ function createRenderer(options: CreateRenderOptionsType) {
     // 挂载
     insert(el, container);
   }
-  // 更新函数 n1:旧node,n2:新node,container:容器
+  // 更新节点函数 n1旧节点 n2 新节点
+  function patchElement(n1: NodeType, n2: NodeType) {
+    // 由于在挂载的时候已经给旧节点赋值el = 他当时的容器container了,所以可以直接从旧节点.el中取到.
+    const el = n2.el = n1.el!;
+    // 首先进行props的更新
+    const oldProps = n1.props;
+    const newProps = n2.props;
+    for (const k in newProps) {
+      patchProps(el, k, newProps[k]);
+    }
+    // 如果旧的props在新的props里面没有,则需要将其删掉
+    for (const k in oldProps) {
+      if (!(k in newProps!)) {
+        patchProps(el, k, null);
+      }
+    }
+    // 进行子节点的更新
+    patchChildren(n1, n2, el);
+  }
+  // 子节点的更新函数 n1旧节点 n2新节点
+  function patchChildren(n1: NodeType, n2: NodeType, el: HTMLElement) {
+    // 新旧子节点之间的关系一共有 3x3=9种, 新旧子节点都有 空节点  文本节点  一组子节点  三种情况,因此要分别判断
+    // 首先是新节点是文本节点的情况
+    if (typeof n2.children === 'string') {
+      // 旧节点为一组子节点情况,卸载旧子节点
+      if (Array.isArray(n1.children)) {
+        n1.children.forEach(c => unmount(c));
+      }
+      // 最终结果都是赋予文本
+      setElementText(el, n2.children);
+    }
+    // 然后是新节点是一组节点的情况
+    else if (Array.isArray(n2.children)) {
+      // 旧节点也是一组节点,涉及到diff算法,此处先简单实现
+      if (Array.isArray(n1.children)) {
+        n1.children.forEach(c => unmount(c));
+        n2.children.forEach(c => mountElement(c, el));
+      }
+      // 旧节点为文本节点或无
+      else {
+        setElementText(el, '');
+        n2.children.forEach(c => mountElement(c, el));
+      }
+    }
+    // 新节点没有子节点的情况
+    else {
+      // 旧节点是一组节点,直接卸载
+      if (Array.isArray(n1.children)) {
+        n1.children.forEach(c => unmount(c));
+      }
+      // 旧节点为文本节点,直接置空
+      else {
+        setElementText(el, '');
+      }
+    }
+  }
+  // vNode转换为真实dom的函数 n1:旧node,n2:新node,container:容器
   function patch(n1: NodeType | undefined | null, n2: NodeType, container: HTMLElement) {
     // 如果旧的node不存在,说明是挂载
     if (!n1) {
       return mountElement(n2, container);
     }
-    return '...';
+    // 如果旧的node存在,否则就是更新
+    return patchElement(n1, n2);
   }
   // 卸载函数
   function unmount(node: NodeType | null | undefined) {

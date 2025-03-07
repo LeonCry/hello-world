@@ -1,4 +1,3 @@
-<!-- 本次提交用来处理事件冒泡与更新时机问题 -->
 <script setup lang="ts">
 import type { CreateRenderOptionsType, NodeType } from './render';
 import createRenderer from './render';
