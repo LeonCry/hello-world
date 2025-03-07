@@ -1,7 +1,5 @@
-// 写在前面: 本次提交用表示文本节点和注释节点的问题
-// 在vNode中,除了单个文本,还有文本节点这种类型,例如:<div>我是文本节点 <img /> </div> 那么这种情况下文本节点就要使用一种
-// 独立的type用来表示并渲染(注释节点也是同理),比如声明一个symbol(text)用来表示文本节点,那么在后续进行挂载或更新的时候,要对其
-// 进行特殊判断.(未开发此次功能)
+import { simpleDiff } from './diff';
+
 export interface NodeType {
   type: string
   props?: Record<string, any>
@@ -77,8 +75,7 @@ function createRenderer(options: CreateRenderOptionsType) {
     else if (Array.isArray(n2.children)) {
       // 旧节点也是一组节点,涉及到diff算法,此处先简单实现
       if (Array.isArray(n1.children)) {
-        n1.children.forEach(c => unmount(c));
-        n2.children.forEach(c => mountElement(c, el));
+        simpleDiff(n1, n2, el, { patch, unmount });
       }
       // 旧节点为单个文本或无
       else {
