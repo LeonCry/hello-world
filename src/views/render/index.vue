@@ -1,4 +1,4 @@
-<!-- 本次提交用来加入事件的处理 -->
+<!-- 本次提交用来处理事件冒泡与更新时机问题 -->
 <script setup lang="ts">
 import type { CreateRenderOptionsType, NodeType } from './render';
 import createRenderer from './render';
@@ -38,13 +38,19 @@ const renderFnOptions: CreateRenderOptionsType = {
         }
         // 如果原先没有,则需要新增事件
         else {
-          invoker[key] = () => {
+          invoker[key] = el._vei[key] = (e: Event) => {
+            // e.timeStamp是事件发生时的时间,当事件发生时,事件还没有被绑定,则不执行事件处理函数
+            // 事件冒泡时,其共享e.timeStamp时间
+            if (e.timeStamp < invoker[key].attached)
+              return;
             // value可能有多个响应函数
             invoker[key].value.forEach((v: any) => v());
           };
           invoker[key].value = value;
           el.addEventListener(eventName, invoker[key]);
         }
+        // 设置当前事件绑定时的时间
+        invoker[key].attached = performance.now();
       }
       else {
         invoker[key] && el.removeEventListener(eventName, invoker[key]);
