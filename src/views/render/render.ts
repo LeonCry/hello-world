@@ -97,12 +97,18 @@ function createRenderer(options: CreateRenderOptionsType) {
   }
   // vNode转换为真实dom的函数 n1:旧node,n2:新node,container:容器
   function patch(n1: NodeType | undefined | null, n2: NodeType, container: HTMLElement) {
-    // 如果旧的node不存在,说明是挂载
+    // 如果旧的node不存在,则直接挂载
     if (!n1) {
-      return mountElement(n2, container);
+      mountElement(n2, container);
     }
-    // 如果旧的node存在,否则就是更新
-    return patchElement(n1, n2);
+    // 如果旧的node存在,则判断旧的node与新的node的type是否一致,不一致则需要先将旧的卸载,再挂载,一致则走更新
+    else {
+      if (n1.type !== n2.type) {
+        unmount(n1);
+        return mountElement(n2, container);
+      }
+      patchElement(n1, n2);
+    }
   }
   // 卸载函数
   function unmount(node: NodeType | null | undefined) {

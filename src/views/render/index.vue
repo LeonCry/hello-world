@@ -82,15 +82,28 @@ onMounted(() => {
   const { effect, ref } = VueReactivity;
   const app = document.getElementById('hello')!;
   const renderer = createRenderer(renderFnOptions);
-  const node: NodeType = {
-    type: 'div',
+  const oldNode = {
+    type: 'h1',
     children: [
-      { type: 'h1', children: 'hello,world', props: { id: 1 } },
-      { type: 'h2', children: 'hello,world2', props: { style: 'color: red' } },
-      { type: 'h3', children: 'hello,world3', props: { onClick: [() => console.log(1), () => console.log(2)] } },
+      { type: 'h1', children: 'hello,world' },
     ],
   };
-  renderer.render(node, app);
+  const newNode = {
+    type: 'section',
+    children: [
+      { type: 'h2', children: 'hello,world2' },
+    ],
+  };
+  // 旧node
+  const el = document.createElement(oldNode.type);
+  const h = document.createElement(oldNode.children[0].type);
+  h.textContent = 'hello,world';
+  el.appendChild(h);
+  app.appendChild(el);
+  oldNode.el = el;
+  oldNode.children[0].el = h;
+  app._vnode = oldNode;
+  renderer.render(newNode, app);
 });
 </script>
 
