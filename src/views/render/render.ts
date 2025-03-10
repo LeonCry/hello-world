@@ -5,6 +5,7 @@ export interface NodeType {
   props?: Record<string, any>
   children: NodeType[] | string
   el?: HTMLElement
+  key?: number
 }
 export interface CreateRenderOptionsType {
   // 创建元素抽象化函数
@@ -12,7 +13,7 @@ export interface CreateRenderOptionsType {
   // 设置文本节点抽象化函数
   setElementText: (el: HTMLElement, text: string) => void
   // 插入元素抽象化函数
-  insert: (el: HTMLElement, parent: HTMLElement, anchor?: HTMLElement | null) => void
+  insert: (el: HTMLElement, parent: HTMLElement, anchor?: HTMLElement | ChildNode | null) => void
   // 进行属性设置的抽象画函数
   patchProps: (el: HTMLElement, key: string, value: any) => void
 }
@@ -75,7 +76,7 @@ function createRenderer(options: CreateRenderOptionsType) {
     else if (Array.isArray(n2.children)) {
       // 旧节点也是一组节点,涉及到diff算法,此处先简单实现
       if (Array.isArray(n1.children)) {
-        simpleDiff(n1, n2, el, { patch, unmount });
+        simpleDiff(n1, n2, el, { patch, unmount, insert });
       }
       // 旧节点为单个文本或无
       else {
@@ -107,6 +108,7 @@ function createRenderer(options: CreateRenderOptionsType) {
         unmount(n1);
         return mountElement(n2, container);
       }
+      // type是一致的,则走更新流程
       patchElement(n1, n2);
     }
   }

@@ -13,11 +13,11 @@ const renderFnOptions: CreateRenderOptionsType = {
     return document.createElement(tag);
   },
   // 设置元素的文本节点
-  setElementText(el: Element, text: string) {
+  setElementText(el: HTMLElement, text: string) {
     el.textContent = text;
   },
   // 在指定父元素下,在anchor元素前插入el元素
-  insert(el: Element, parent: Element, anchor: Element | null = null) {
+  insert(el: HTMLElement, parent: HTMLElement, anchor: HTMLElement | ChildNode | null = null) {
     parent.insertBefore(el, anchor);
   },
   // 进行属性设置,由于在属性设置的时候,我们要优先使用el.key = value 进行设置
@@ -82,28 +82,26 @@ onMounted(() => {
   const { effect, ref } = VueReactivity;
   const app = document.getElementById('hello')!;
   const renderer = createRenderer(renderFnOptions);
-  const oldNode = {
-    type: 'h1',
+  const oldNode: NodeType = {
+    type: 'div',
     children: [
-      { type: 'h1', children: 'hello,world' },
+      { type: 'p', children: '1', key: 1 },
+      { type: 'p', children: '2', key: 2 },
+      { type: 'p', children: 'hello', key: 3 },
     ],
   };
-  const newNode = {
-    type: 'section',
+  const newNode: NodeType = {
+    type: 'div',
     children: [
-      { type: 'h2', children: 'hello,world2' },
+      { type: 'p', children: 'world', key: 3 },
+      { type: 'p', children: '1', key: 1 },
+      { type: 'p', children: '2', key: 2 },
     ],
   };
-  // 旧node
-  const el = document.createElement(oldNode.type);
-  const h = document.createElement(oldNode.children[0].type);
-  h.textContent = 'hello,world';
-  el.appendChild(h);
-  app.appendChild(el);
-  oldNode.el = el;
-  oldNode.children[0].el = h;
-  app._vnode = oldNode;
-  renderer.render(newNode, app);
+  renderer.render(oldNode, app);
+  setTimeout(() => {
+    renderer.render(newNode, app);
+  }, 2000);
 });
 </script>
 
