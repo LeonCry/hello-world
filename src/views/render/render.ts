@@ -21,7 +21,7 @@ export interface CreateRenderOptionsType {
 function createRenderer(options: CreateRenderOptionsType) {
   const { createElement, setElementText, insert, patchProps } = options;
   // 挂载函数
-  function mountElement(node: NodeType, container: HTMLElement) {
+  function mountElement(node: NodeType, container: HTMLElement, anchor?: HTMLElement | ChildNode | null) {
     // 创建dom元素,将虚拟node与真实node通过node.el建立联系
     const el = node.el = createElement(node.type);
     // 进行属性properties设置
@@ -39,7 +39,7 @@ function createRenderer(options: CreateRenderOptionsType) {
       });
     }
     // 挂载
-    insert(el, container);
+    insert(el, container, anchor);
   }
   // 更新节点函数 n1旧节点 n2 新节点
   function patchElement(n1: NodeType, n2: NodeType) {
@@ -76,7 +76,7 @@ function createRenderer(options: CreateRenderOptionsType) {
     else if (Array.isArray(n2.children)) {
       // 旧节点也是一组节点,涉及到diff算法,此处先简单实现
       if (Array.isArray(n1.children)) {
-        simpleDiff(n1, n2, el, { patch, unmount, insert });
+        simpleDiff(n1, n2, el, { patch, unmount, insert, mountElement });
       }
       // 旧节点为单个文本或无
       else {

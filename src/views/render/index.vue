@@ -88,6 +88,7 @@ onMounted(() => {
       { type: 'p', children: '1', key: 1 },
       { type: 'p', children: '2', key: 2 },
       { type: 'p', children: 'hello', key: 3 },
+      { type: 'p', children: 'OLD ELE', key: 4 },
     ],
   };
   const newNode: NodeType = {
