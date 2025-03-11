@@ -70,4 +70,9 @@ function simpleDiff(n1: NodeType, n2: NodeType, container: HTMLElement, dependen
   }
 }
 
-export { simpleDiff };
+// 双端diff算法
+function twoEndDiff(n1: NodeType, n2: NodeType, container: HTMLElement, dependencies: DependenciesType) {
+  console.log(n1, n2, container, dependencies);
+}
+
+export { simpleDiff, twoEndDiff };
