@@ -1,4 +1,4 @@
-// 本次提交用来实现:双端diff下需要卸载旧元素的情况
+// 本次提交用来实现:
 import type { NodeType } from './render';
 
 interface DependenciesType {
@@ -183,5 +183,9 @@ function twoEndDiff(n1: NodeType, n2: NodeType, container: HTMLElement, dependen
     }
   }
 }
+// 快速diff算法
+function fastDiff(n1: NodeType, n2: NodeType, container: HTMLElement, dependencies: DependenciesType) {
+  console.log(n1, n2, container, dependencies);
+}
 
-export { simpleDiff, twoEndDiff };
+export { fastDiff, simpleDiff, twoEndDiff };
