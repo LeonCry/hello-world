@@ -1,4 +1,5 @@
-import { simpleDiff } from './diff';
+// import { simpleDiff } from './diff';
+import { twoEndDiff } from './diff';
 
 export interface NodeType {
   type: string
@@ -76,7 +77,7 @@ function createRenderer(options: CreateRenderOptionsType) {
     else if (Array.isArray(n2.children)) {
       // 旧节点也是一组节点,涉及到diff算法,此处先简单实现
       if (Array.isArray(n1.children)) {
-        simpleDiff(n1, n2, el, { patch, unmount, insert, mountElement });
+        twoEndDiff(n1, n2, el, { patch, unmount, insert, mountElement });
       }
       // 旧节点为单个文本或无
       else {
