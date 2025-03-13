@@ -1,9 +1,4 @@
-// 本次提交用来实现:双端diff下,增加新元素时的处理
-// 增加新元素时,新节点组里面势必会有n个节点在旧元素组中查找不到,首先触发的逻辑是 "非理想情况双端diff逻辑"
-// 当 "非理想情况" 也未找到相等key时,则应该触发新添元素的逻辑,新添元素应该是
-// 新元素组的头部节点添加到旧元素组的头部节点之前,新元素头部index++
-// 缺陷:但是当旧元素组和新元素组相等key一一对应后,最终只剩下了新子元素的新元素,此时代码已经运行完,因此需要再额外增加逻辑
-// 当一一对应完之后,旧子元素已经全部对应完,剩下的新子元素应该挂载到旧元素的头部
+// 本次提交用来实现:双端diff下需要卸载旧元素的情况
 import type { NodeType } from './render';
 
 interface DependenciesType {
@@ -78,7 +73,7 @@ function twoEndDiff(n1: NodeType, n2: NodeType, container: HTMLElement, dependen
   function isKeySame(nodeA: NodeType, nodeB: NodeType) {
     return nodeA.key === nodeB.key;
   }
-  const { patch, insert, mountElement } = dependencies;
+  const { patch, insert, mountElement, unmount } = dependencies;
   assertIsNodeType(n1.children);
   assertIsNodeType(n2.children);
   const oldChildren = n1.children;
@@ -173,11 +168,18 @@ function twoEndDiff(n1: NodeType, n2: NodeType, container: HTMLElement, dependen
     mountElement(newChildren[newStartIndex], container, oldChildren[oldStartIndex].el);
     newStartIndex++;
   }
-  // 缺陷处理
+  // 新元素挂载缺陷处理
   if (oldEndIndex < oldStartIndex && newEndIndex >= newStartIndex) {
     for (let n = newEndIndex; n <= newStartIndex; n++) {
       const newNode = newChildren[n];
       mountElement(newNode, container, oldChildren[oldStartIndex]?.el || oldChildren[oldStartIndex - 1].el?.nextSibling);
+    }
+  }
+  // 旧元素卸载处理
+  else if (newEndIndex < newStartIndex && oldEndIndex >= oldStartIndex) {
+    for (let o = oldStartIndex; o <= oldEndIndex; o++) {
+      const oldNode = oldChildren[o];
+      unmount(oldNode);
     }
   }
 }
