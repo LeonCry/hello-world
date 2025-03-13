@@ -1,6 +1,9 @@
-// 本次提交用来实现:非理想情况下的双端diff流程.
-// 非理想情况指,进行4次查找时,并不能每次都能查到相等的key,此时就需要通过增加额外的步骤来处理这种非理想情况
-// 具体做法是拿新的节点头部去旧的节点的其他节点寻找
+// 本次提交用来实现:双端diff下,增加新元素时的处理
+// 增加新元素时,新节点组里面势必会有n个节点在旧元素组中查找不到,首先触发的逻辑是 "非理想情况双端diff逻辑"
+// 当 "非理想情况" 也未找到相等key时,则应该触发新添元素的逻辑,新添元素应该是
+// 新元素组的头部节点添加到旧元素组的头部节点之前,新元素头部index++
+// 缺陷:但是当旧元素组和新元素组相等key一一对应后,最终只剩下了新子元素的新元素,此时代码已经运行完,因此需要再额外增加逻辑
+// 当一一对应完之后,旧子元素已经全部对应完,剩下的新子元素应该挂载到旧元素的头部
 import type { NodeType } from './render';
 
 interface DependenciesType {
@@ -75,7 +78,7 @@ function twoEndDiff(n1: NodeType, n2: NodeType, container: HTMLElement, dependen
   function isKeySame(nodeA: NodeType, nodeB: NodeType) {
     return nodeA.key === nodeB.key;
   }
-  const { patch, insert } = dependencies;
+  const { patch, insert, mountElement } = dependencies;
   assertIsNodeType(n1.children);
   assertIsNodeType(n2.children);
   const oldChildren = n1.children;
@@ -148,17 +151,33 @@ function twoEndDiff(n1: NodeType, n2: NodeType, container: HTMLElement, dependen
     }
     if (isJump)
       continue;
+    // 是否非理想情况
+    let isUnideal = false;
     // 此处开始处理非理想情况,获得新节点的头部元素,并在旧节点中头尾之间的node查找key相等的元素
     const newNodeHead = newChildren[newStartIndex];
     for (let d = oldStartIndex + 1; d < oldEndIndex; d++) {
       // 如果查找到相等key的旧节点,则需要将其移动到旧节点头部之前,并将当前旧节点Node设为null,表示其已经处理过了
       // 并且新节点头部newStartIndex也需要下移
       if (newNodeHead.key === oldChildren[d].key) {
+        patch(oldChildren[d], newNodeHead, container);
         insert(oldChildren[d].el!, container, oldChildren[oldStartIndex].el);
         oldChildren[d] = null as unknown as any;
         newStartIndex++;
+        isUnideal = true;
         break;
       }
+    }
+    if (isUnideal)
+      continue;
+    // 此时是新元素,需要将其挂载
+    mountElement(newChildren[newStartIndex], container, oldChildren[oldStartIndex].el);
+    newStartIndex++;
+  }
+  // 缺陷处理
+  if (oldEndIndex < oldStartIndex && newEndIndex >= newStartIndex) {
+    for (let n = newEndIndex; n <= newStartIndex; n++) {
+      const newNode = newChildren[n];
+      mountElement(newNode, container, oldChildren[oldStartIndex]?.el || oldChildren[oldStartIndex - 1].el?.nextSibling);
     }
   }
 }
