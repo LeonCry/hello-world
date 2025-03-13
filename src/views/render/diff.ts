@@ -1,4 +1,6 @@
-// 本次提交用来实现:理想情况下的双端diff流程.(理想情况指,每次进行4次查找时,都可以找到相等的key).
+// 本次提交用来实现:非理想情况下的双端diff流程.
+// 非理想情况指,进行4次查找时,并不能每次都能查到相等的key,此时就需要通过增加额外的步骤来处理这种非理想情况
+// 具体做法是拿新的节点头部去旧的节点的其他节点寻找
 import type { NodeType } from './render';
 
 interface DependenciesType {
@@ -88,7 +90,8 @@ function twoEndDiff(n1: NodeType, n2: NodeType, container: HTMLElement, dependen
   // oldStartIndex节点与newEndIndex节点 & oldEndIndex节点与newStartIndex节点 之间是否能找得到相同的key的元素
   // 大前提是oldEndIndex >= oldStartIndex && newEndIndex >= newStartIndex
   while (oldEndIndex >= oldStartIndex && newEndIndex >= newStartIndex) {
-    // debugger;
+    // 是否跳过当前节点的flag
+    let isJump = false;
     console.log(oldEndIndex, oldStartIndex, newEndIndex, newStartIndex);
     const eventIndexes = [
       [oldStartIndex, newStartIndex],
@@ -100,8 +103,16 @@ function twoEndDiff(n1: NodeType, n2: NodeType, container: HTMLElement, dependen
       const [curOldIndex, curNewIndex] = eventIndexes[k];
       const curOldNode = oldChildren[curOldIndex];
       const curNewNode = newChildren[curNewIndex];
+      // 如果 curOldNode 为 null,说明该元素已经被处理过了,则需要 oldStartIndex++ 或者 oldEndIndex--
+      if (curOldNode === null) {
+        isJump = true;
+        curOldIndex === oldStartIndex ? oldStartIndex++ : oldEndIndex--;
+        break;
+      }
       // 寻找到了相同key的新旧子元素
       if (isKeySame(curOldNode, curNewNode)) {
+        // 找到了相同元素,说明额外步骤不需要再执行
+        isJump = true;
         // 先对元素进行更新
         patch(curOldNode, curNewNode, container);
         // 如果两个key相等的node的索引都是头部,则不需要移动位置,如果索引不相同,则是需要移动元素的
@@ -132,6 +143,20 @@ function twoEndDiff(n1: NodeType, n2: NodeType, container: HTMLElement, dependen
           oldEndIndex--;
           newStartIndex++;
         }
+        break;
+      }
+    }
+    if (isJump)
+      continue;
+    // 此处开始处理非理想情况,获得新节点的头部元素,并在旧节点中头尾之间的node查找key相等的元素
+    const newNodeHead = newChildren[newStartIndex];
+    for (let d = oldStartIndex + 1; d < oldEndIndex; d++) {
+      // 如果查找到相等key的旧节点,则需要将其移动到旧节点头部之前,并将当前旧节点Node设为null,表示其已经处理过了
+      // 并且新节点头部newStartIndex也需要下移
+      if (newNodeHead.key === oldChildren[d].key) {
+        insert(oldChildren[d].el!, container, oldChildren[oldStartIndex].el);
+        oldChildren[d] = null as unknown as any;
+        newStartIndex++;
         break;
       }
     }
