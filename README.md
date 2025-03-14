@@ -1,4 +1,4 @@
-# SEACI-VUE 项目模板
+# #SEACI-VUE 项目模板
 
 - github: https://github.com/LeonCry/vue-template
 
