@@ -1,4 +1,5 @@
-// 本次提交用来实现:
+// 本次提交用来实现:快速 diff 算法中的预处理过程。
+// 预处理过程就是指将子元素数组中前后相同的元素进行 patch，新增的或者删除的将其挂载与删除.
 import type { NodeType } from './render';
 
 interface DependenciesType {
@@ -185,7 +186,41 @@ function twoEndDiff(n1: NodeType, n2: NodeType, container: HTMLElement, dependen
 }
 // 快速diff算法
 function fastDiff(n1: NodeType, n2: NodeType, container: HTMLElement, dependencies: DependenciesType) {
-  console.log(n1, n2, container, dependencies);
+  assertIsNodeType(n1.children);
+  assertIsNodeType(n2.children);
+  const oldChildren = n1.children;
+  const newChildren = n2.children;
+  let newStart = 0;
+  let oldStart = 0;
+  let newEnd = newChildren.length - 1;
+  let oldEnd = oldChildren.length - 1;
+  const { patch, mountElement, unmount } = dependencies;
+  // 先从头部开始
+  while (newChildren[newStart].key === oldChildren[oldStart].key) {
+    patch(oldChildren[oldStart], newChildren[newStart], container);
+    newStart++;
+    oldStart++;
+  }
+  //   头部结束再从尾部开始预处理
+  while (newChildren[newEnd].key === oldChildren[oldEnd].key) {
+    patch(oldChildren[oldEnd], newChildren[newEnd], container);
+    newEnd--;
+    oldEnd--;
+  }
+  // 如果oldEnd < oldStart 且 newEnd >= newStart，则说明有新增的
+  // 需要将新增的挂载到oldStart的前面
+  if (oldEnd < oldStart && newEnd >= newStart) {
+    for (let i = newStart; i <= newEnd; i++) {
+      mountElement(newChildren[i], container, oldChildren[oldStart].el);
+    }
+  }
+  // 如果newEnd < newStart 且 oldEnd >= oldStart，则说明有需要删除的
+  // 需要将删除的进行卸载掉
+  if (newEnd < newStart && oldEnd >= oldStart) {
+    for (let i = oldStart; i <= oldEnd; i++) {
+      unmount(oldChildren[i]);
+    }
+  }
 }
 
 export { fastDiff, simpleDiff, twoEndDiff };
