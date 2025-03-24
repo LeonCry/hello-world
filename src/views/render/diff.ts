@@ -1,6 +1,6 @@
-// 本次提交用来实现:快速 diff 算法中的预处理过程。
-// 预处理过程就是指将子元素数组中前后相同的元素进行 patch，新增的或者删除的将其挂载与删除.
+// 本次提交用来实现:非理想情况下的快速diff算法
 import type { NodeType } from './render';
+import getLis from './getLis';
 
 interface DependenciesType {
 // 依赖render.ts中的patch函数
@@ -194,7 +194,7 @@ function fastDiff(n1: NodeType, n2: NodeType, container: HTMLElement, dependenci
   let oldStart = 0;
   let newEnd = newChildren.length - 1;
   let oldEnd = oldChildren.length - 1;
-  const { patch, mountElement, unmount } = dependencies;
+  const { patch, mountElement, unmount, insert } = dependencies;
   // 先从头部开始
   while (newChildren[newStart].key === oldChildren[oldStart].key) {
     patch(oldChildren[oldStart], newChildren[newStart], container);
@@ -216,9 +216,60 @@ function fastDiff(n1: NodeType, n2: NodeType, container: HTMLElement, dependenci
   }
   // 如果newEnd < newStart 且 oldEnd >= oldStart，则说明有需要删除的
   // 需要将删除的进行卸载掉
-  if (newEnd < newStart && oldEnd >= oldStart) {
+  else if (newEnd < newStart && oldEnd >= oldStart) {
     for (let i = oldStart; i <= oldEnd; i++) {
       unmount(oldChildren[i]);
+    }
+  }
+  else {
+    // 处理非理想情况
+  // 创建一个新子节点组中key与index的索引表，用该索引表获得旧子节点组中key元素的位置并存到source数组中
+    const newKeyIndexes: Record<number, number> = {};
+    const source = Array.from({ length: newEnd - newStart + 1 }).fill(-1) as number[];
+    // 遍历新元素组
+    for (let i = newStart; i <= newEnd; i++) {
+      // 将新子元素组里面的元素(key)作为key,元素的索引index作为value进行存储
+      newKeyIndexes[newChildren[i].key!] = i;
+    }
+    // 遍历旧元素组,填补source数组，并更新相同key的元素的props
+    for (let j = oldStart; j <= oldEnd; j++) {
+      const oldNode = oldChildren[j];
+      const newI = newKeyIndexes[oldNode.key!];
+      // 说明当前oldNode在新子元素组中找不到，即是需要被卸载掉的元素
+      if (typeof newI === 'undefined') {
+        unmount(oldNode);
+      }
+      else {
+        source[newI - newStart] = j;
+        patch(oldNode, newChildren[newI], container);
+      }
+    }
+    // 此时source(index,value)已经构建完毕，里面保存着新子元素第index个元素在旧子元素组中的位置为value
+    // 然后，我们需要判断元素是否需要移动，与简单diff算法一样，当索引是递增的时候，那么元素是不需要移动的，那么此时我们需要找
+    // 到一个最大递增序列，这个最大递增序列表示对应的元素组的顺序是确定的，这一组元素是不需要移动的
+    const seq = getLis(source);
+    // 然后我们创建一个索引n用来指向新子元素组的最后一个元素，创建一个s用来指向seq的最后一个元素
+    const n = newEnd - newStart;
+    let s = seq.length - 1;
+    // 然后从新子元素组开始倒着向上遍历
+    for (let nn = n; nn >= 0; nn--) {
+      // 如果source[nn]是-1，表示这个元素是新增的，那么需要将其挂载，挂载到当前元素下一个子节点的元素之前
+      if (source[nn] === -1) {
+        const newNode = newChildren[nn + newStart];
+        const anchor = nn + newStart + 1 >= newChildren.length ? null : newChildren[nn + newStart + 1].el;
+        mountElement(newNode, container, anchor);
+      }
+      // 如果 nn === seq[s],则说明进入了最大递增序列中，这些元素是不需要移动的
+      else if (nn === seq[s]) {
+        s--;
+      }
+      // 否则，是需要移动元素的，如何移动?
+      else {
+        const newNode = newChildren[nn + newStart];
+        // 此时我们找到该元素的下一个节点
+        const anchor = nn + newStart + 1 >= newChildren.length ? null : newChildren[nn + newStart + 1].el;
+        insert(newNode.el!, container, anchor);
+      }
     }
   }
 }
