@@ -27,6 +27,10 @@ const routes: Array<RouteRecordRaw> = [
         path: 'render',
         component: () => import('@/views/render/index.vue'),
       },
+      {
+        path: 'component',
+        component: () => import('@/views/component/index.vue'),
+      },
     ],
   },
 ];

@@ -2,8 +2,14 @@
 // import { twoEndDiff } from './diff';
 import { fastDiff } from './diff';
 
+declare const VueReactivity: {
+  effect: (...args: any) => any
+  ref: (...args: any) => { value: any }
+  reactive: (...args: any) => { value: any }
+};
+const { reactive, effect } = VueReactivity;
 export interface NodeType {
-  type: string
+  type: string | any
   props?: Record<string, any>
   children: NodeType[] | string
   el?: HTMLElement
@@ -99,7 +105,14 @@ function createRenderer(options: CreateRenderOptionsType) {
     }
   }
   // vNode转换为真实dom的函数 n1:旧node,n2:新node,container:容器
-  function patch(n1: NodeType | undefined | null, n2: NodeType, container: HTMLElement) {
+  function patch(n1: NodeType | undefined | null, n2: NodeType, container: HTMLElement, anchor?: HTMLElement) {
+    // 如果n2.type是对象属性，则说明，这是一个组件，需要通过组件的方式进行挂载与更新
+    if (typeof n2.type === 'object') {
+      if (!n1)
+        mountComponent!(n2, container, anchor);
+      else patchComponent!(n1, n2, container, anchor);
+      return;
+    }
     // 如果旧的node不存在,则直接挂载
     if (!n1) {
       mountElement(n2, container);
@@ -131,6 +144,24 @@ function createRenderer(options: CreateRenderOptionsType) {
       unmount(container._vnode);
     }
     container._vnode = vnode;
+  }
+  // 组件的挂载
+  function mountComponent(node: NodeType, container: HTMLElement, anchor?: HTMLElement) {
+    const componentOptions = node.type;
+    const { render, data } = componentOptions;
+    // 获得对应的data
+    const status = reactive(data());
+    // 当status发生变化时，则触发副作用函数
+    effect(() => {
+      // 获得对应的虚拟DOM
+      const subTree = render.call(status, status);
+      // 进行正常的挂载
+      patch(null, subTree, container, anchor);
+    });
+  }
+  // 组件的更新
+  function patchComponent(n1: NodeType, n2: NodeType, container: HTMLElement, anchor?: HTMLElement | ChildNode | null) {
+
   }
   return { render };
 }

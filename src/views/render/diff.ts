@@ -1,4 +1,3 @@
-// 本次提交用来实现:非理想情况下的快速diff算法
 import type { NodeType } from './render';
 import getLis from './getLis';
 
@@ -69,7 +68,7 @@ function simpleDiff(n1: NodeType, n2: NodeType, container: HTMLElement, dependen
   }
 }
 
-// 双端diff算法
+// 双端diff算法(VUE2)
 function twoEndDiff(n1: NodeType, n2: NodeType, container: HTMLElement, dependencies: DependenciesType) {
   function isKeySame(nodeA: NodeType, nodeB: NodeType) {
     return nodeA.key === nodeB.key;
@@ -184,7 +183,7 @@ function twoEndDiff(n1: NodeType, n2: NodeType, container: HTMLElement, dependen
     }
   }
 }
-// 快速diff算法
+// 快速diff算法(VUE3)
 function fastDiff(n1: NodeType, n2: NodeType, container: HTMLElement, dependencies: DependenciesType) {
   assertIsNodeType(n1.children);
   assertIsNodeType(n2.children);

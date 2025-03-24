@@ -7,6 +7,7 @@ export {}
 
 declare module 'vue' {
   export interface GlobalComponents {
+    Component: typeof import('./src/views/component/index.vue')['default']
     'Compute&watch': typeof import('./src/views/compute&watch/index.vue')['default']
     Computed: typeof import('./src/views/computed/index.vue')['default']
     'Computed&watch': typeof import('./src/views/computed&watch/index.vue')['default']
