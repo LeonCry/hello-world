@@ -1,19 +1,32 @@
 // import { simpleDiff } from './diff';
 // import { twoEndDiff } from './diff';
 import { fastDiff } from './diff';
+import { judgePropsChange, resolveProps } from './utils';
 
 declare const VueReactivity: {
   effect: (...args: any) => any
   ref: (...args: any) => { value: any }
   reactive: (...args: any) => { value: any }
+  shallowReactive: (...args: any) => { value: any }
 };
-const { reactive, effect } = VueReactivity;
+const { reactive, effect, shallowReactive } = VueReactivity;
 export interface NodeType {
   type: string | any
   props?: Record<string, any>
   children: NodeType[] | string
   el?: HTMLElement
   key?: number
+  // 以下为type为组件的属性
+  component?: Record<string, any> // 组件实例
+  // 生命周期函数
+  beforeCreate?: () => void
+  created?: () => void
+  beforeMount?: () => void
+  mounted?: () => void
+  beforeUpdate?: () => void
+  updated?: () => void
+  beforeUnmount?: () => void
+  unmounted?: () => void
 }
 export interface CreateRenderOptionsType {
   // 创建元素抽象化函数
@@ -110,7 +123,7 @@ function createRenderer(options: CreateRenderOptionsType) {
     if (typeof n2.type === 'object') {
       if (!n1)
         mountComponent!(n2, container, anchor);
-      else patchComponent!(n1, n2, container, anchor);
+      else patchComponent!(n1, n2);
       return;
     }
     // 如果旧的node不存在,则直接挂载
@@ -148,20 +161,61 @@ function createRenderer(options: CreateRenderOptionsType) {
   // 组件的挂载
   function mountComponent(node: NodeType, container: HTMLElement, anchor?: HTMLElement) {
     const componentOptions = node.type;
-    const { render, data } = componentOptions;
+    // 该props为定义在元素上的一些props(<p id=1 title=hello></p>)
+    const props = node.props;
+    // 该props为组件自身定义的props: (const props = defineProps<{...}>())
+    const { render, data, props: componentProps } = componentOptions;
+    // 获取props中componentProps定义的值
+    const { realProps } = resolveProps(componentProps, props!);
+    // 获取生命周期函数
+    const { beforeCreate, created, beforeMount, mounted, beforeUpdate, updated } = componentOptions;
+    beforeCreate && beforeCreate();
     // 获得对应的data
     const status = reactive(data());
+    // 保存组件的实例
+    const instance = {
+      status,
+      props: shallowReactive(realProps),
+      isMounted: false,
+      subTree: null,
+    };
+    node.component = instance;
+    created && created.call(status, status);
     // 当status发生变化时，则触发副作用函数
     effect(() => {
       // 获得对应的虚拟DOM
       const subTree = render.call(status, status);
-      // 进行正常的挂载
-      patch(null, subTree, container, anchor);
+      // 如果当前是未挂载,则直接进行挂载
+      if (!node.component?.isMounted) {
+        beforeMount && beforeMount.call(status, status);
+        patch(null, subTree, container, anchor);
+        node.component!.isMounted = true;
+        mounted && mounted.call(status, status);
+      }
+      // 如果已经挂载过了，则直接更新
+      else {
+        beforeUpdate && beforeUpdate.call(status, status);
+        patch(node.component!.subTree, subTree, container, anchor);
+        updated && updated.call.call(status, status);
+      }
+      node.component!.subTree = subTree;
     });
   }
-  // 组件的更新
-  function patchComponent(n1: NodeType, n2: NodeType, container: HTMLElement, anchor?: HTMLElement | ChildNode | null) {
-
+  // 组件的更新:本次提交仅考虑props的情况
+  // 当元素的props由{title:xxx} 变为了 {title:hello world}时，这种props的转变其实时在父组件中完成的
+  // 在父组件中完成那么mountComponent就不能用了，需要使用组件的更新函数。n1:旧Node n2:新Node
+  function patchComponent(n1: NodeType, n2: NodeType) {
+    // n2可能是新Node，还没有对其进行component(instance)的挂载
+    const instance = n2.component = n1.component;
+    // 判断新旧Node是否有Props的更新
+    if (judgePropsChange(n1.props!, n2.props!)) {
+      const { realProps } = resolveProps(instance!.props, n2.props!);
+      // 由于instance上的props是shallowReactive,因此不能直接进行赋值，会顶替掉shallowReactive属性
+      Object.entries(realProps).forEach(([key, value]) => {
+        instance!.props[key] = value;
+      });
+      // instance.props变更,reactive代理将会自动触发effect副作用函数.
+    }
   }
   return { render };
 }

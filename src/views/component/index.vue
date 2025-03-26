@@ -78,6 +78,9 @@ onMounted(() => {
   const app = document.getElementById('hello')!;
   const MyComponent = {
     name: 'MyComponent',
+    props: {
+      title: String,
+    },
     data() {
       return {
         foo: 'hello,world',
@@ -92,6 +95,10 @@ onMounted(() => {
   };
   const component: NodeType = {
     type: MyComponent,
+    props: {
+      title: 'this his title',
+      other: 'this is other',
+    },
     children: '',
   };
   const renderer = createRenderer(renderFnOptions);
@@ -103,4 +110,5 @@ onMounted(() => {
   <div id="hello" />
 </template>
 
-<style scoped lang="scss"></style>
+<style scoped lang="scss">
+</style>

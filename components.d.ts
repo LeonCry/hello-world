@@ -13,6 +13,7 @@ declare module 'vue' {
     'Computed&watch': typeof import('./src/views/computed&watch/index.vue')['default']
     DefaultLayout: typeof import('./src/layouts/defaultLayout.vue')['default']
     Hello: typeof import('./src/views/Hello.vue')['default']
+    Meet: typeof import('./src/views/test/Meet.vue')['default']
     Reactive: typeof import('./src/views/reactive/index.vue')['default']
     Ref: typeof import('./src/views/ref/index.vue')['default']
     Render: typeof import('./src/views/render/index.vue')['default']
@@ -20,6 +21,6 @@ declare module 'vue' {
     ResponseSystem: typeof import('./src/views/responseSystem/index.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
-    Test: typeof import('./src/layouts/Test.vue')['default']
+    Test: typeof import('./src/views/test/index.vue')['default']
   }
 }
