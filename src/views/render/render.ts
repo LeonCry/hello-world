@@ -6,8 +6,8 @@ import { judgePropsChange, resolveProps } from './utils';
 declare const VueReactivity: {
   effect: (...args: any) => any
   ref: (...args: any) => { value: any }
-  reactive: (...args: any) => { value: any }
-  shallowReactive: (...args: any) => { value: any }
+  reactive: (...args: any) => Record<any, any>
+  shallowReactive: (...args: any) => Record<any, any>
 };
 const { reactive, effect, shallowReactive } = VueReactivity;
 export interface NodeType {
@@ -179,24 +179,45 @@ function createRenderer(options: CreateRenderOptionsType) {
       isMounted: false,
       subTree: null,
     };
+    // 由于在Vue中，可以直接访问到props里面的数据(并且在模板中不需要通过props.进行访问).
+    // 因此，我们需要将props暴露给render函数
+    // 创建一个上下文代理对象,该对象用来解决：
+    // 如果在组件中访问的是data()里面定义的变量数据，则直接返回该数据，
+    // 如果访问的是props里面的，则返回props里面的数据(且props不可更改)
+    const renderContext = new Proxy(instance, {
+      get(target, key: string) {
+        const { status, props } = target;
+        if (key in status)
+          return status[key];
+        else return props[key];
+      },
+      set(target, key: string, value) {
+        if (key in status)
+          return status[key] = value;
+        else if (key in props!)
+          throw new Error('不可编辑props');
+        return false;
+      },
+    });
+
     node.component = instance;
-    created && created.call(status, status);
+    created && created.call(renderContext, renderContext);
     // 当status发生变化时，则触发副作用函数
     effect(() => {
       // 获得对应的虚拟DOM
-      const subTree = render.call(status, status);
+      const subTree = render.call(renderContext, renderContext);
       // 如果当前是未挂载,则直接进行挂载
       if (!node.component?.isMounted) {
-        beforeMount && beforeMount.call(status, status);
+        beforeMount && beforeMount.call(renderContext, renderContext);
         patch(null, subTree, container, anchor);
         node.component!.isMounted = true;
-        mounted && mounted.call(status, status);
+        mounted && mounted.call(renderContext, renderContext);
       }
       // 如果已经挂载过了，则直接更新
       else {
-        beforeUpdate && beforeUpdate.call(status, status);
+        beforeUpdate && beforeUpdate.call(renderContext, renderContext);
         patch(node.component!.subTree, subTree, container, anchor);
-        updated && updated.call.call(status, status);
+        updated && updated.call.call(renderContext, renderContext);
       }
       node.component!.subTree = subTree;
     });
