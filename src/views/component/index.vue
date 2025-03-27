@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { CreateRenderOptionsType, NodeType } from '@/views/render/render';
 import createRenderer from '@/views/render/render';
+import { onMyMounted } from '../render/lifeCycle';
 
 const baseOptions = { // 创建元素
   createElement(tag: string) {
@@ -87,6 +88,9 @@ onMounted(() => {
       const { emit } = setupContext;
       const count = ref(1);
       emit('change', count.value);
+      onMyMounted(() => {
+        console.log('onMyMounted...');
+      });
       return {
         count,
       };

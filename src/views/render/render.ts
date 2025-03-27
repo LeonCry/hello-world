@@ -1,6 +1,7 @@
 // import { simpleDiff } from './diff';
 // import { twoEndDiff } from './diff';
 import { fastDiff } from './diff';
+import { setCurrentInstance } from './lifeCycle';
 import { judgePropsChange, resolveProps } from './utils';
 
 declare const VueReactivity: {
@@ -18,15 +19,6 @@ export interface NodeType {
   key?: number
   // 以下为type为组件的属性
   component?: Record<string, any> // 组件实例
-  // 生命周期函数
-  beforeCreate?: () => void
-  created?: () => void
-  beforeMount?: () => void
-  mounted?: () => void
-  beforeUpdate?: () => void
-  updated?: () => void
-  beforeUnmount?: () => void
-  unmounted?: () => void
 }
 export interface CreateRenderOptionsType {
   // 创建元素抽象化函数
@@ -174,17 +166,20 @@ function createRenderer(options: CreateRenderOptionsType) {
     }
     // 在setup函数中，可以传入两个参数，第一个是props,第二个是setupContent,其中包括{attrs,slots,emit}等...
     const setupContent = { attrs, emit };
-    // 获取生命周期函数
-    const { beforeCreate, created, beforeMount, mounted, beforeUpdate, updated } = componentOptions;
-    beforeCreate && beforeCreate();
     // 保存组件的实例
     const instance = {
       props: shallowReactive(realProps),
       isMounted: false,
       subTree: null,
+      mounted: [],
     };
+    // 设置当前组件实例,将setup中生命周期函数执行的callbackFn挂载到当前实例上
+    setCurrentInstance(instance);
     // setup函数返回的数据有两种，一种是函数，一种是对象。如果是函数，则表明返回的是render函数，则替代原来的render函数。如果是对象，则表明返回的是实例数据
     const setupResult = setup(shallowReadonly(instance.props), setupContent);
+    // setup函数执行完毕，生命周期函数挂载完毕,将当前实例设为null
+    setCurrentInstance(null);
+    // ---这里应该是beforeCreate生命周期函数---
     let setupState: Record<string, any> | null = null;
     if (typeof setupResult === 'function') {
       render = setupResult;
@@ -217,23 +212,24 @@ function createRenderer(options: CreateRenderOptionsType) {
     });
 
     node.component = instance;
-    created && created.call(renderContext, renderContext);
+    // ---这里应该是Created生命周期函数---
     // 当status发生变化时，则触发副作用函数
     effect(() => {
       // 获得对应的虚拟DOM
       const subTree = render.call(renderContext, renderContext);
       // 如果当前是未挂载,则直接进行挂载
       if (!node.component?.isMounted) {
-        beforeMount && beforeMount.call(renderContext, renderContext);
+        // ---这里应该是beforeMounted生命周期函数---
         patch(null, subTree, container, anchor);
         node.component!.isMounted = true;
-        mounted && mounted.call(renderContext, renderContext);
+        // ---这里应该是Mounted生命周期函数---
+        instance.mounted.forEach((fn: any) => fn());
       }
       // 如果已经挂载过了，则直接更新
       else {
-        beforeUpdate && beforeUpdate.call(renderContext, renderContext);
+        // ---这里应该是beforeUpdate生命周期函数---
         patch(node.component!.subTree, subTree, container, anchor);
-        updated && updated.call.call(renderContext, renderContext);
+        // ---这里应该是updated生命周期函数---
       }
       node.component!.subTree = subTree;
     });
