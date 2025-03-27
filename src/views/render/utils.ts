@@ -10,6 +10,9 @@ export function resolveProps(componentProps: Record<string, any>, props: Record<
   Object.entries(props).forEach(([key, value]) => {
     if (componentProps[key] !== undefined)
       realProps[key] = value;
+    // 对于以on开头的属性，自动加入到realProps
+    else if (key.startsWith('on'))
+      realProps[key] = value;
     else attrs[key] = value;
   });
   return { realProps, attrs };

@@ -167,8 +167,13 @@ function createRenderer(options: CreateRenderOptionsType) {
     let { render, props: componentProps, setup } = componentOptions;
     // 获取props中componentProps定义的值
     const { realProps, attrs } = resolveProps(componentProps, props!);
+    // 此处实现emit
+    function emit(event: string, ...args: any) {
+      const eventFn = realProps![`on${event[0].toUpperCase()}${event.slice(1)}`];
+      eventFn && eventFn(...args);
+    }
     // 在setup函数中，可以传入两个参数，第一个是props,第二个是setupContent,其中包括{attrs,slots,emit}等...
-    const setupContent = { attrs };
+    const setupContent = { attrs, emit };
     // 获取生命周期函数
     const { beforeCreate, created, beforeMount, mounted, beforeUpdate, updated } = componentOptions;
     beforeCreate && beforeCreate();
@@ -187,6 +192,7 @@ function createRenderer(options: CreateRenderOptionsType) {
     else {
       setupState = setupResult;
     }
+
     // 由于在Vue中，可以直接访问到props里面的数据(并且在模板中不需要通过props.进行访问).
     // 因此，我们需要将props暴露给render函数
     // 创建一个上下文代理对象,该对象用来解决：

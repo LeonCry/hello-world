@@ -83,8 +83,10 @@ onMounted(() => {
     },
     // 之前提交的data属于vue2中的内容，虽然在vue3中仍然可以使用，但是不推荐使用
     // setup函数是vue3中的新内容，用于替代vue2中的data，本项目不实现vue3中的data函数
-    setup() {
+    setup(props: Record<string, any>, setupContext: Record<string, any>) {
+      const { emit } = setupContext;
       const count = ref(1);
+      emit('change', count.value);
       return {
         count,
       };
@@ -101,6 +103,9 @@ onMounted(() => {
     props: {
       title: 'this his title',
       other: 'this is other',
+      onChange: (value: any) => {
+        console.log('the count value is', value);
+      },
     },
     children: '',
   };
