@@ -9,7 +9,7 @@ declare const VueReactivity: {
   reactive: (...args: any) => Record<any, any>
   shallowReactive: (...args: any) => Record<any, any>
 };
-const { reactive, effect, shallowReactive } = VueReactivity;
+const { effect, shallowReactive } = VueReactivity;
 export interface NodeType {
   type: string | any
   props?: Record<string, any>
@@ -164,36 +164,46 @@ function createRenderer(options: CreateRenderOptionsType) {
     // 该props为定义在元素上的一些props(<p id=1 title=hello></p>)
     const props = node.props;
     // 该props为组件自身定义的props: (const props = defineProps<{...}>())
-    const { render, data, props: componentProps } = componentOptions;
+    let { render, props: componentProps, setup } = componentOptions;
     // 获取props中componentProps定义的值
-    const { realProps } = resolveProps(componentProps, props!);
+    const { realProps, attrs } = resolveProps(componentProps, props!);
+    // 在setup函数中，可以传入两个参数，第一个是props,第二个是setupContent,其中包括{attrs,slots,emit}等...
+    const setupContent = { attrs };
     // 获取生命周期函数
     const { beforeCreate, created, beforeMount, mounted, beforeUpdate, updated } = componentOptions;
     beforeCreate && beforeCreate();
-    // 获得对应的data
-    const status = reactive(data());
     // 保存组件的实例
     const instance = {
-      status,
       props: shallowReactive(realProps),
       isMounted: false,
       subTree: null,
     };
+    // setup函数返回的数据有两种，一种是函数，一种是对象。如果是函数，则表明返回的是render函数，则替代原来的render函数。如果是对象，则表明返回的是实例数据
+    const setupResult = setup(shallowReadonly(instance.props), setupContent);
+    let setupState: Record<string, any> | null = null;
+    if (typeof setupResult === 'function') {
+      render = setupResult;
+    }
+    else {
+      setupState = setupResult;
+    }
     // 由于在Vue中，可以直接访问到props里面的数据(并且在模板中不需要通过props.进行访问).
     // 因此，我们需要将props暴露给render函数
     // 创建一个上下文代理对象,该对象用来解决：
     // 如果在组件中访问的是data()里面定义的变量数据，则直接返回该数据，
     // 如果访问的是props里面的，则返回props里面的数据(且props不可更改)
     const renderContext = new Proxy(instance, {
-      get(target, key: string) {
-        const { status, props } = target;
-        if (key in status)
-          return status[key];
-        else return props[key];
+      get(_target, key: string) {
+        if (setupState && key in setupState) {
+          return setupState[key];
+        }
+        else {
+          return props![key];
+        }
       },
-      set(target, key: string, value) {
-        if (key in status)
-          return status[key] = value;
+      set(_target, key: string, value) {
+        if (setupState && key in setupState)
+          return setupState[key] = value;
         else if (key in props!)
           throw new Error('不可编辑props');
         return false;

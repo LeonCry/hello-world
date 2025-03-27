@@ -81,15 +81,18 @@ onMounted(() => {
     props: {
       title: String,
     },
-    data() {
+    // 之前提交的data属于vue2中的内容，虽然在vue3中仍然可以使用，但是不推荐使用
+    // setup函数是vue3中的新内容，用于替代vue2中的data，本项目不实现vue3中的data函数
+    setup() {
+      const count = ref(1);
       return {
-        foo: 'hello,world',
+        count,
       };
     },
     render(this: any) {
       return {
         type: 'div',
-        children: `foo 的值是: ${this.foo}`,
+        children: `foo 的值是: ${this.count}`,
       };
     },
   };

@@ -13,6 +13,7 @@ export default antfu(
       'unused-imports/no-unused-vars': ['warn'],
       'eqeqeq': ['error', 'always'],
       'no-console': 'off',
+      'antfu/if-newline': 'off',
     },
   },
 );
