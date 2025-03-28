@@ -31,6 +31,10 @@ const routes: Array<RouteRecordRaw> = [
         path: 'component',
         component: () => import('@/views/component/index.vue'),
       },
+      {
+        path: 'compiler',
+        component: () => import('@/views/compiler/index.vue'),
+      },
     ],
   },
 ];
