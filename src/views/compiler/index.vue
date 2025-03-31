@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { tokenize } from './compiler';
+import { ASTBuilder, tokenize } from './compiler';
 
 const template = '<div><p>Vue</p><p>Template</p></div>';
-const result = tokenize(template);
-console.log(result);
+const resToken = tokenize(template);
+const resAST = ASTBuilder(resToken);
+console.log(resToken);
+console.log(resAST);
 </script>
 
 <template>

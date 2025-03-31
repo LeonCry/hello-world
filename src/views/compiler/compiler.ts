@@ -2,6 +2,12 @@ interface TokenType {
   type: string
   value: string | null
 }
+interface NodeType {
+  type: string
+  tag?: string
+  content?: string
+  children: NodeType[]
+}
 // 定义状态机的状态
 const state = {
   initial: 1, // 初始状态 => 要么进入标签开始状态，要么进入文本状态
@@ -57,7 +63,7 @@ export function tokenize(str: string) {
         // 进入标签闭合状态
         else if (c === '>') {
           currentState = state.initial;
-          if (tokens.length > 0 && tokens[tokens.length - 1].type === 'tagEnd') {
+          if (tokens[tokens.length - 1]?.value === null && tokens[tokens.length - 1].type === 'tagEnd') {
             tokens[tokens.length - 1].value = content.join('');
           }
           else {
@@ -105,4 +111,35 @@ export function tokenize(str: string) {
     }
   }
   return tokens;
+}
+// 根据token构建AST
+export function ASTBuilder(tokens: TokenType[]) {
+  const root: NodeType = {
+    type: 'Root',
+    children: [],
+  };
+  const stack: NodeType[] = [root];
+  tokens.forEach((token) => {
+    if (token.type === 'tag') {
+      const node: NodeType = {
+        type: 'Element',
+        tag: token.value!,
+        children: [],
+      };
+      stack[stack.length - 1].children.push(node);
+      stack.push(node);
+    }
+    else if (token.type === 'text') {
+      const text: NodeType = {
+        type: 'Text',
+        content: token.value!,
+        children: [],
+      };
+      stack[stack.length - 1].children.push(text);
+    }
+    else if (token.type === 'tagEnd') {
+      stack.pop();
+    }
+  });
+  return root;
 }
