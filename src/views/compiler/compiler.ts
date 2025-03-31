@@ -8,6 +8,12 @@ interface NodeType {
   content?: string
   children: NodeType[]
 }
+interface TransformContext {
+  currentNode: NodeType | null
+  parent: NodeType | null
+  childIndex: number
+  nodeTransforms: ((node: NodeType, context: TransformContext) => void)[]
+}
 // 定义状态机的状态
 const state = {
   initial: 1, // 初始状态 => 要么进入标签开始状态，要么进入文本状态
@@ -142,4 +148,40 @@ export function ASTBuilder(tokens: TokenType[]) {
     }
   });
   return root;
+}
+// 辅助函数:用来打印AST结构树
+export function dump(node: NodeType, indent = 0) {
+  const type = node.type;
+  const printValue = type === 'Root' ? 'Root' : type === 'Element' ? `Element:${node.tag}` : `Text:${node.content}`;
+  console.log(`${'-'.repeat(indent) + printValue}`);
+  node.children.forEach((c) => {
+    dump(c, indent + 2);
+  });
+}
+
+// 遍历节点
+function traverseNodes(node: NodeType, context: TransformContext) {
+  context.currentNode = node;
+  context.nodeTransforms.forEach((trFn) => {
+    trFn(node, context);
+  });
+  const children = context.currentNode?.children;
+  for (let i = 0; i < children?.length; i++) {
+    context.parent = context.currentNode;
+    context.childIndex = i;
+    traverseNodes(children[i], context);
+  }
+}
+
+// 模板AST转换为JavaScriptAST函数
+export function transform(node: NodeType) {
+  // 上下文
+  const context = {
+    currentNode: null,
+    parent: null,
+    childIndex: 0,
+    nodeTransforms: [],
+  };
+  traverseNodes(node, context);
+  dump(node);
 }
