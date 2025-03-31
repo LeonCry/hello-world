@@ -56,7 +56,8 @@ export function tokenize(str: string) {
         }
         // 进入标签闭合状态
         else if (c === '>') {
-          if (tokens?.[tokens.length - 1]?.type === 'tagEnd') {
+          currentState = state.initial;
+          if (tokens.length > 0 && tokens[tokens.length - 1].type === 'tagEnd') {
             tokens[tokens.length - 1].value = content.join('');
           }
           else {
@@ -66,14 +67,13 @@ export function tokenize(str: string) {
             });
           }
           content.length = 0;
-          currentState = state.tagClose;
         }
         str = str.slice(1);
         break;
       case state.tagClose:
         // 只能进入初始状态
         content.push(c);
-        currentState = state.initial;
+        currentState = state.tagEnd;
         str = str.slice(1);
         break;
       case state.text:
