@@ -161,9 +161,10 @@ export function dump(node: NodeType, indent = 0) {
 
 // 遍历节点
 function traverseNodes(node: NodeType, context: TransformContext) {
+  const exitFn: any = [];
   context.currentNode = node;
   context.nodeTransforms.forEach((trFn) => {
-    trFn(node, context);
+    exitFn.push(trFn(node, context));
   });
   const children = context.currentNode?.children;
   for (let i = 0; i < children?.length; i++) {
@@ -171,16 +172,25 @@ function traverseNodes(node: NodeType, context: TransformContext) {
     context.childIndex = i;
     traverseNodes(children[i], context);
   }
+  while (exitFn.length) {
+    exitFn.pop()();
+  }
 }
 
 // 模板AST转换为JavaScriptAST函数
 export function transform(node: NodeType) {
+  const testTransforms = () => {
+    console.log('进入节点...');
+    return () => {
+      console.log('退出节点...');
+    };
+  };
   // 上下文
   const context = {
     currentNode: null,
     parent: null,
     childIndex: 0,
-    nodeTransforms: [],
+    nodeTransforms: [testTransforms],
   };
   traverseNodes(node, context);
   dump(node);
