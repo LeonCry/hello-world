@@ -179,10 +179,6 @@ function traverseNodes(node: NodeType, context: TransformContext) {
 }
 
 // 模板AST转换为JavaScriptAST函数
-// 对于 <div><p>Vue</p><p>Template</p></div>，其转换后的JavaScriptAST为
-// function render() {
-//  return h('div', [h('p', 'Vue'), h('p', 'Template')])
-// }
 export function transform(node: NodeType) {
   // 用来转换文本的函数
   const transformText = (node: NodeType) => {
@@ -258,4 +254,57 @@ function createCallExpression(callee: string, argument: any[]) {
     callee: createIdentifier(callee),
     argument,
   };
+}
+
+// 生成最终代码
+export function generate(node: Record<string, any>) {
+  const context = {
+    code: '',
+    // 缩进
+    currentIndent: 0,
+    push(c: string) {
+      this.code += c;
+    },
+    newLine() {
+      this.code += `\n${'  '.repeat(this.currentIndent)}`;
+    },
+    indent() {
+      this.currentIndent++;
+      this.newLine();
+    },
+    deIndent() {
+      this.currentIndent--;
+      this.newLine();
+    },
+  };
+  generateCode(context, node);
+  return context.code;
+}
+// 对于 <div><p>Vue</p><p>Template</p></div>，其转换后的JavaScriptAST为
+// function render() {
+//  return h('div', [h('p', 'Vue'), h('p', 'Template')])
+// }
+function generateCode(context: Record<string, any>, node: Record<string, any>) {
+  const { push: cPush, indent: cIndent, deIndent: cDeIndent } = context;
+  const push = cPush.bind(context);
+  const indent = cIndent.bind(context);
+  const deIndent = cDeIndent.bind(context);
+  switch (node.type) {
+    case 'FunctionDecl':
+      push(`function ${node.id.name}(){ `);
+      indent();
+      node.body.forEach((n: any) => generateCode(context, n));
+      deIndent();
+      push('}');
+      return context.code;
+    case 'ReturnStatement':
+      push(`return ${generateCode(context, node.return)}`);
+      return context.code;
+    case 'callExpression':
+      return (`${node.callee.name}(${(node.argument.map((n: any) => generateCode(context, n))).join(', ')})`);
+    case 'StringLiteral':
+      return `'${node.value}'`;
+    case 'arrayExpression':
+      return (`[${(node.elements.map((n: any) => generateCode(context, n))).join(', ')}]`);
+  }
 }
