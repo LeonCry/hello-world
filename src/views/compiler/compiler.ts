@@ -3,10 +3,11 @@ interface TokenType {
   value: string | null
 }
 interface NodeType {
-  type: string
+  type: 'Text' | 'Element' | 'Root'
   tag?: string
   content?: string
   children: NodeType[]
+  jsNode?: Record<string, any>
 }
 interface TransformContext {
   currentNode: NodeType | null
@@ -173,16 +174,37 @@ function traverseNodes(node: NodeType, context: TransformContext) {
     traverseNodes(children[i], context);
   }
   while (exitFn.length) {
-    exitFn.pop()();
+    exitFn.pop()?.();
   }
 }
 
 // 模板AST转换为JavaScriptAST函数
+// 对于 <div><p>Vue</p><p>Template</p></div>，其转换后的JavaScriptAST为
+// function render() {
+//  return h('div', [h('p', 'Vue'), h('p', 'Template')])
+// }
 export function transform(node: NodeType) {
-  const testTransforms = () => {
-    console.log('进入节点...');
+  // 用来转换文本的函数
+  const transformText = (node: NodeType) => {
+    if (node.type !== 'Text') return;
+    node.jsNode = createStringLiteral(node.content!);
+  };
+  // 用来转换元素的函数
+  const transformElement = (node: NodeType) => {
+    // 返回一个函数，放入transform时的exitFn中，用于在子元素节点都处理完毕时再处理本节点。
     return () => {
-      console.log('退出节点...');
+      if (node.type !== 'Element') return;
+      const callExp = createCallExpression('h', [createStringLiteral(node.tag!)]);
+      if (!node.children.length) return;
+      // 判断其子节点的元素个数
+      if (node.children.length === 1) {
+        callExp.argument.push(node.children[0].jsNode);
+      }
+      // 数组类型
+      else {
+        callExp.argument.push(createArrayExpression(node.children.map(n => n.jsNode)));
+      }
+      node.jsNode = callExp;
     };
   };
   // 上下文
@@ -190,8 +212,50 @@ export function transform(node: NodeType) {
     currentNode: null,
     parent: null,
     childIndex: 0,
-    nodeTransforms: [testTransforms],
+    nodeTransforms: [transformText, transformElement],
   };
   traverseNodes(node, context);
-  dump(node);
+  const jsAST = {
+    type: 'FunctionDecl',
+    id: { type: 'Identifier', name: 'render' },
+    params: [],
+    body: [
+      {
+        type: 'ReturnStatement',
+        return: node.children[0].jsNode,
+      },
+    ],
+  };
+  return jsAST;
+}
+
+// 转换为JavaScriptAST的辅助函数
+// 创建string节点
+function createStringLiteral(value: string) {
+  return {
+    type: 'StringLiteral',
+    value,
+  };
+}
+// 创建数组节点
+function createArrayExpression(elements: any[]) {
+  return {
+    type: 'arrayExpression',
+    elements,
+  };
+}
+// 创建Identifier节点
+function createIdentifier(name: string) {
+  return {
+    type: 'identifier',
+    name,
+  };
+}
+// 创建CallExpression函数h
+function createCallExpression(callee: string, argument: any[]) {
+  return {
+    type: 'callExpression',
+    callee: createIdentifier(callee),
+    argument,
+  };
 }
